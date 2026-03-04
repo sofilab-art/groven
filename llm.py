@@ -19,9 +19,9 @@ Your task: classify how a new Branch relates to its parent node.
 
 The five Branch types are:
 - clarification: sharpens or makes precise what the parent said, without adding new content
-- extension: carries the idea into new territory the parent did not anticipate
+- extension: builds on and supports the parent's direction, carrying it into new territory the parent did not anticipate; does NOT raise objections or concerns about the parent
 - reframing: same observation, fundamentally different interpretive angle; does not contradict
-- contradiction: identifies a conflict, proposes a divergent direction
+- contradiction: challenges, objects to, or undermines the parent's proposal; this includes raising concerns, objections, or practical problems that call the parent's viability into question, even if the objection introduces new considerations
 - synthesis: connects two or more existing lines of thought; reconciles divergent Branches
 
 Respond ONLY with valid JSON. No preamble, no explanation outside the JSON.
@@ -148,3 +148,56 @@ def generate_lineage(parent_body, branch_body, branch_type):
     except Exception as e:
         print(f"[LLM] Lineage generation error: {e}")
         return "Builds on the parent contribution."
+
+
+TITLE_SYSTEM_PROMPT = """You are a title generator for Groven, a structured deliberation platform.
+
+Given a parent contribution and a new branch contribution, write a short descriptive title for the branch.
+The title should be concise (max 8 words) and capture the branch's main point or stance.
+People will read this title in a node diagram to understand where the discussion is going.
+
+Respond ONLY with the title, no quotes, no preamble."""
+
+TITLE_USER_TEMPLATE = """Parent contribution:
+---
+{parent_body}
+---
+
+New branch:
+---
+{branch_body}
+---
+
+Branch type: {branch_type}
+
+Write a short descriptive title."""
+
+
+def generate_title(parent_body, branch_body, branch_type):
+    """
+    Auto-generate a node title using gpt-5-mini.
+    Returns a string, or a fallback on error.
+    """
+    try:
+        cl = _get_client()
+        user_message = TITLE_USER_TEMPLATE.format(
+            parent_body=parent_body,
+            branch_body=branch_body,
+            branch_type=branch_type or "unknown"
+        )
+
+        response = cl.chat.completions.create(
+            model="gpt-5-mini",
+            messages=[
+                {"role": "system", "content": TITLE_SYSTEM_PROMPT},
+                {"role": "user", "content": user_message}
+            ],
+            max_completion_tokens=2048,
+            timeout=15
+        )
+
+        return response.choices[0].message.content.strip()
+
+    except Exception as e:
+        print(f"[LLM] Title generation error: {e}")
+        return "Untitled branch"

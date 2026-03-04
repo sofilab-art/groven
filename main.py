@@ -184,11 +184,18 @@ def api_preview_node():
         branch_type=proposed_type or "extension"
     )
 
+    suggested_title = llm.generate_title(
+        parent_body=parent_node["body"],
+        branch_body=body,
+        branch_type=proposed_type or "extension"
+    )
+
     return jsonify({
         "proposed_type": proposed_type,
         "confidence": confidence,
         "explanation": explanation,
-        "lineage_desc": lineage_desc
+        "lineage_desc": lineage_desc,
+        "suggested_title": suggested_title
     })
 
 

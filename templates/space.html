@@ -64,9 +64,9 @@
                         <input type="text" id="author-input" name="author" required placeholder="Your name">
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" id="title-group">
                         <label for="title-input">Title</label>
-                        <input type="text" id="title-input" name="title" required placeholder="Short headline">
+                        <input type="text" id="title-input" name="title" placeholder="Short headline">
                     </div>
 
                     <div class="form-group">
@@ -119,6 +119,12 @@
         </div>
 
         <div class="review-modal-body">
+            <div class="form-group">
+                <label for="review-title">Suggested title</label>
+                <span class="label-hint">Short headline for the node graph</span>
+                <input type="text" id="review-title" placeholder="Title">
+            </div>
+
             <div class="form-group">
                 <label for="review-lineage">Lineage description</label>
                 <span class="label-hint">How this branch relates to its parent</span>

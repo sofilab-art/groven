@@ -17,12 +17,17 @@
     const parentIndicatorName = document.getElementById('parent-indicator-name');
     const clearParentBtn = document.getElementById('clear-parent');
 
+    const titleGroup = document.getElementById('title-group');
+
     function updateFormMode() {
         const mode = form.querySelector('input[name="contribution_type"]:checked').value;
         const isBranch = mode === 'branch';
 
         // Show parent indicator only if in branch mode AND a parent is selected
         parentIndicator.style.display = (isBranch && parentSelect.value) ? 'flex' : 'none';
+
+        // Hide title field for branches (LLM will suggest one)
+        titleGroup.style.display = isBranch ? 'none' : '';
 
         if (!isBranch) {
             // Reset branch-specific fields
@@ -96,6 +101,7 @@
             const modal = document.getElementById('review-modal');
 
             // Populate modal fields
+            document.getElementById('review-title').value = preview.suggested_title || '';
             document.getElementById('review-lineage').value = preview.lineage_desc || '';
             document.getElementById('review-explanation').textContent =
                 preview.explanation || 'LLM unavailable \u2014 please classify manually.';
@@ -128,8 +134,12 @@
         const title = document.getElementById('title-input').value.trim();
         const body = document.getElementById('body-input').value.trim();
 
-        if (!author || !title || !body) {
-            alert('Author, title, and contribution are required fields.');
+        if (!author || !body) {
+            alert('Author and contribution are required fields.');
+            return;
+        }
+        if (mode === 'seed' && !title) {
+            alert('Seeds require a title.');
             return;
         }
 
@@ -199,6 +209,7 @@
                 return;
             }
 
+            payload.title = document.getElementById('review-title').value.trim();
             payload.branch_type = selectedType.value;
             payload.lineage_desc = document.getElementById('review-lineage').value.trim();
             payload.llm_proposed_type = preview.proposed_type;
