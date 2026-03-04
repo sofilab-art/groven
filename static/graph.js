@@ -214,7 +214,7 @@
             if (node.contested) {
                 llmHtml = `
                     <div class="llm-info-box llm-info-contested">
-                        <div class="llm-info-header"><span class="llm-label">LLM-Analyse</span></div>
+                        <div class="llm-info-header"><span class="llm-label">LLM Analysis</span></div>
                         <p class="contested-info">
                             LLM proposed <span class="type-badge type-${node.llm_proposed_type}">${node.llm_proposed_type}</span>
                             — author chose <span class="type-badge type-${node.branch_type}">${node.branch_type}</span>
@@ -224,7 +224,7 @@
             } else {
                 llmHtml = `
                     <div class="llm-info-box">
-                        <div class="llm-info-header"><span class="llm-label">LLM-Analyse</span></div>
+                        <div class="llm-info-header"><span class="llm-label">LLM Analysis</span></div>
                         <p>Type: <span class="type-badge type-${node.llm_proposed_type}">${node.llm_proposed_type}</span> (confirmed)</p>
                         ${node.llm_explanation ? `<p class="llm-explanation">${node.llm_explanation}</p>` : ''}
                     </div>`;
@@ -238,7 +238,7 @@
             </div>
             <h3 style="margin:0.5rem 0;color:#1B4332;">${node.title || 'Contribution by ' + node.author}</h3>
             <div class="node-meta" style="margin-bottom:0.75rem;">
-                <span>von <strong>${node.author}</strong></span>
+                <span>by <strong>${node.author}</strong></span>
             </div>
             <div class="node-body" style="font-size:0.88rem;">${node.body}</div>
             ${node.lineage_desc ? `
