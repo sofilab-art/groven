@@ -32,9 +32,9 @@
                 <span class="contested-badge">Contested</span>
                 {% endif %}
             </div>
-            <h1>{{ node.title or "Beitrag von " + node.author }}</h1>
+            <h1>{{ node.title or "Contribution by " + node.author }}</h1>
             <div class="node-meta">
-                <span class="node-author-label">von <strong>{{ node.author }}</strong></span>
+                <span class="node-author-label">by <strong>{{ node.author }}</strong></span>
                 <span class="node-date">{{ node.created_at }}</span>
             </div>
         </header>
@@ -56,15 +56,15 @@
         {% if node.llm_proposed_type %}
         <div class="llm-info-box {% if node.contested %}llm-info-contested{% endif %}">
             <div class="llm-info-header">
-                <span class="llm-label">LLM-Analyse</span>
+                <span class="llm-label">LLM Analysis</span>
             </div>
             {% if node.contested %}
             <p class="contested-info">
-                LLM schlug <span class="type-badge type-{{ node.llm_proposed_type }}">{{ node.llm_proposed_type }}</span> vor
-                — Autor wählte <span class="type-badge type-{{ node.branch_type }}">{{ node.branch_type }}</span>
+                LLM proposed <span class="type-badge type-{{ node.llm_proposed_type }}">{{ node.llm_proposed_type }}</span>
+                — author chose <span class="type-badge type-{{ node.branch_type }}">{{ node.branch_type }}</span>
             </p>
             {% else %}
-            <p>Vorgeschlagener Typ: <span class="type-badge type-{{ node.llm_proposed_type }}">{{ node.llm_proposed_type }}</span> (bestätigt)</p>
+            <p>Proposed type: <span class="type-badge type-{{ node.llm_proposed_type }}">{{ node.llm_proposed_type }}</span> (confirmed)</p>
             {% endif %}
             {% if node.llm_explanation %}
             <p class="llm-explanation">{{ node.llm_explanation }}</p>
@@ -99,7 +99,7 @@
         {% endif %}
 
         <div class="back-link">
-            <a href="/space/{{ space.id }}">&larr; Zurück zum Space</a>
+            <a href="/space/{{ space.id }}">&larr; Back to space</a>
         </div>
     </article>
 </div>

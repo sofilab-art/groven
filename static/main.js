@@ -57,11 +57,11 @@
             const lineageDesc = lineageInput.value.trim();
 
             if (!parentId) {
-                alert('Bitte wähle eine Parent Node aus.');
+                alert('Please select a parent node.');
                 return;
             }
             if (!body) {
-                alert('Bitte schreibe einen Beitrag.');
+                alert('Please write a contribution.');
                 return;
             }
 
@@ -103,11 +103,11 @@
                     // LLM unavailable — show manual selection
                     llmResult.style.display = 'block';
                     document.querySelector('.llm-proposal-card').innerHTML =
-                        '<p style="color:#999;font-size:0.85rem;">LLM-Vorschlag nicht verfügbar. Bitte Typ manuell wählen.</p>';
+                        '<p style="color:#999;font-size:0.85rem;">LLM suggestion unavailable. Please select a type manually.</p>';
                 }
 
                 llmBtn.style.display = 'block';
-                llmBtn.textContent = 'Erneut vorschlagen';
+                llmBtn.textContent = 'Suggest again';
 
             } catch (err) {
                 console.error('[LLM] Error:', err);
@@ -115,7 +115,7 @@
                 llmBtn.style.display = 'block';
                 llmResult.style.display = 'block';
                 document.querySelector('.llm-proposal-card').innerHTML =
-                    '<p style="color:#EF4444;font-size:0.85rem;">Fehler beim LLM-Aufruf. Bitte Typ manuell wählen.</p>';
+                    '<p style="color:#EF4444;font-size:0.85rem;">LLM request failed. Please select a type manually.</p>';
             }
         });
     }
@@ -134,7 +134,7 @@
         const body = document.getElementById('body-input').value.trim();
 
         if (!author || !body) {
-            alert('Autor und Beitrag sind Pflichtfelder.');
+            alert('Author and contribution are required fields.');
             return;
         }
 
@@ -151,15 +151,15 @@
             const branchType = form.querySelector('input[name="branch_type"]:checked');
 
             if (!parentId) {
-                alert('Bitte wähle eine Parent Node aus.');
+                alert('Please select a parent node.');
                 return;
             }
             if (!lineageDesc) {
-                alert('Die Lineage-Beschreibung ist ein Pflichtfeld für Branches.');
+                alert('Lineage description is required for branches.');
                 return;
             }
             if (!branchType) {
-                alert('Bitte wähle einen Branch-Typ aus (oder fordere zuerst einen LLM-Vorschlag an).');
+                alert('Please select a branch type (or request an LLM suggestion first).');
                 return;
             }
 
@@ -172,7 +172,7 @@
 
         const submitBtn = document.getElementById('submit-btn');
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Wird gespeichert...';
+        submitBtn.textContent = 'Saving...';
 
         try {
             const response = await fetch('/api/node', {
@@ -187,16 +187,16 @@
                 // Success — reload to see updated graph and node list
                 window.location.reload();
             } else {
-                alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
+                alert('Error: ' + (data.error || 'Unknown error'));
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Beitrag absenden';
+                submitBtn.textContent = 'Submit contribution';
             }
 
         } catch (err) {
             console.error('[Submit] Error:', err);
-            alert('Netzwerkfehler. Bitte versuche es erneut.');
+            alert('Network error. Please try again.');
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Beitrag absenden';
+            submitBtn.textContent = 'Submit contribution';
         }
     });
 

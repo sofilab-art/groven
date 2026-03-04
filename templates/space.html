@@ -28,17 +28,17 @@
 
             <!-- Contribution Form -->
             <div id="contribution-form-wrapper">
-                <h3>Beitrag hinzufügen</h3>
+                <h3>Add contribution</h3>
                 <form id="contribution-form" data-space-id="{{ space.id }}">
                     <!-- Seed vs Branch toggle -->
                     <div class="form-toggle">
                         <label class="toggle-option">
                             <input type="radio" name="contribution_type" value="seed" checked>
-                            <span>Neuer Seed</span>
+                            <span>New Seed</span>
                         </label>
                         <label class="toggle-option">
                             <input type="radio" name="contribution_type" value="branch">
-                            <span>Neuer Branch</span>
+                            <span>New Branch</span>
                         </label>
                     </div>
 
@@ -47,7 +47,7 @@
                         <div class="form-group">
                             <label for="parent-select">Parent Node</label>
                             <select id="parent-select" name="parent_id">
-                                <option value="">— Wähle eine Node —</option>
+                                <option value="">— Select a node —</option>
                                 {% for node in nodes %}
                                 <option value="{{ node.id }}">
                                     {{ node.author }}: {{ node.title or node.body[:60] }}
@@ -58,52 +58,52 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="author-input">Autor</label>
-                        <input type="text" id="author-input" name="author" required placeholder="Dein Name">
+                        <label for="author-input">Author</label>
+                        <input type="text" id="author-input" name="author" required placeholder="Your name">
                     </div>
 
                     <div class="form-group">
-                        <label for="title-input">Titel <span class="optional">(optional)</span></label>
-                        <input type="text" id="title-input" name="title" placeholder="Kurze Überschrift">
+                        <label for="title-input">Title <span class="optional">(optional)</span></label>
+                        <input type="text" id="title-input" name="title" placeholder="Short headline">
                     </div>
 
                     <div class="form-group">
-                        <label for="body-input">Beitrag</label>
+                        <label for="body-input">Contribution</label>
                         <textarea id="body-input" name="body" required rows="5"
-                                  placeholder="Dein Beitrag..."></textarea>
+                                  placeholder="Your contribution..."></textarea>
                     </div>
 
                     <!-- Lineage desc (branch only) -->
                     <div id="lineage-field" style="display:none;">
                         <div class="form-group">
-                            <label for="lineage-input">Lineage-Beschreibung
+                            <label for="lineage-input">Lineage description
                                 <span class="label-hint">What does this build on, and where does it take the argument?</span>
                             </label>
                             <textarea id="lineage-input" name="lineage_desc" rows="3"
-                                      placeholder="Worauf baut dieser Branch auf, und wohin führt er das Argument?"></textarea>
+                                      placeholder="What does this branch build on, and where does it take the argument?"></textarea>
                         </div>
                     </div>
 
                     <!-- LLM Proposal Section (branch only) -->
                     <div id="llm-section" style="display:none;">
                         <button type="button" id="llm-propose-btn" class="btn btn-secondary">
-                            LLM-Vorschlag anfordern
+                            Get LLM suggestion
                         </button>
                         <div id="llm-spinner" class="spinner" style="display:none;">
                             <div class="spinner-dot"></div>
-                            Analysiere...
+                            Analyzing...
                         </div>
                         <div id="llm-result" style="display:none;">
                             <div class="llm-proposal-card">
                                 <div class="llm-proposal-header">
-                                    <span class="llm-label">LLM-Vorschlag:</span>
+                                    <span class="llm-label">LLM suggestion:</span>
                                     <span id="llm-proposed-type" class="type-badge"></span>
                                 </div>
                                 <p id="llm-explanation" class="llm-explanation"></p>
                                 <div id="llm-confidence" class="llm-confidence"></div>
                             </div>
                             <div class="type-choice">
-                                <label class="type-label">Typ bestätigen oder überstimmen:</label>
+                                <label class="type-label">Confirm or override type:</label>
                                 <div class="type-radio-group" id="type-radio-group">
                                     <label class="type-radio">
                                         <input type="radio" name="branch_type" value="clarification">
@@ -134,13 +134,13 @@
                     <input type="hidden" id="llm-proposed-type-hidden" name="llm_proposed_type" value="">
                     <input type="hidden" id="llm-explanation-hidden" name="llm_explanation" value="">
 
-                    <button type="submit" id="submit-btn" class="btn btn-primary">Beitrag absenden</button>
+                    <button type="submit" id="submit-btn" class="btn btn-primary">Submit contribution</button>
                 </form>
             </div>
 
             <!-- Node List -->
             <div class="node-list">
-                <h3>Alle Beiträge</h3>
+                <h3>All contributions</h3>
                 <div id="node-list-items">
                     {% for node in nodes %}
                     <a href="/node/{{ node.id }}" class="node-list-item {% if node.contested %}contested{% endif %}">

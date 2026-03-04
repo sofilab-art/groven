@@ -195,7 +195,7 @@
         })
         .catch(err => {
             console.error('[Graph] Failed to load tree:', err);
-            container.innerHTML = '<p style="padding:2rem;color:#999;">Graph konnte nicht geladen werden.</p>';
+            container.innerHTML = '<p style="padding:2rem;color:#999;">Failed to load graph.</p>';
         });
 
     // Show node detail in the right panel
@@ -216,8 +216,8 @@
                     <div class="llm-info-box llm-info-contested">
                         <div class="llm-info-header"><span class="llm-label">LLM-Analyse</span></div>
                         <p class="contested-info">
-                            LLM schlug <span class="type-badge type-${node.llm_proposed_type}">${node.llm_proposed_type}</span> vor
-                            — Autor wählte <span class="type-badge type-${node.branch_type}">${node.branch_type}</span>
+                            LLM proposed <span class="type-badge type-${node.llm_proposed_type}">${node.llm_proposed_type}</span>
+                            — author chose <span class="type-badge type-${node.branch_type}">${node.branch_type}</span>
                         </p>
                         ${node.llm_explanation ? `<p class="llm-explanation">${node.llm_explanation}</p>` : ''}
                     </div>`;
@@ -225,7 +225,7 @@
                 llmHtml = `
                     <div class="llm-info-box">
                         <div class="llm-info-header"><span class="llm-label">LLM-Analyse</span></div>
-                        <p>Typ: <span class="type-badge type-${node.llm_proposed_type}">${node.llm_proposed_type}</span> (bestätigt)</p>
+                        <p>Type: <span class="type-badge type-${node.llm_proposed_type}">${node.llm_proposed_type}</span> (confirmed)</p>
                         ${node.llm_explanation ? `<p class="llm-explanation">${node.llm_explanation}</p>` : ''}
                     </div>`;
             }
@@ -236,7 +236,7 @@
                 <span class="type-badge type-${typeLabel}">${typeLabel}</span>
                 ${contested}
             </div>
-            <h3 style="margin:0.5rem 0;color:#1B4332;">${node.title || 'Beitrag von ' + node.author}</h3>
+            <h3 style="margin:0.5rem 0;color:#1B4332;">${node.title || 'Contribution by ' + node.author}</h3>
             <div class="node-meta" style="margin-bottom:0.75rem;">
                 <span>von <strong>${node.author}</strong></span>
             </div>
@@ -249,7 +249,7 @@
             ${llmHtml}
             <div style="margin-top:0.75rem;">
                 <a href="/node/${node.id}" class="btn btn-secondary" style="text-align:center;display:block;">
-                    Zur Detailansicht &rarr;
+                    View details &rarr;
                 </a>
             </div>
         `;
