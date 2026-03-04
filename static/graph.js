@@ -213,21 +213,21 @@
         if (node.llm_proposed_type) {
             if (node.contested) {
                 llmHtml = `
-                    <div class="llm-info-box llm-info-contested">
-                        <div class="llm-info-header"><span class="llm-label">LLM Analysis</span></div>
+                    <details class="llm-info-box llm-info-contested">
+                        <summary class="llm-label">LLM Analysis</summary>
                         <p class="contested-info">
                             LLM proposed <span class="type-badge type-${node.llm_proposed_type}">${node.llm_proposed_type}</span>
                             — author chose <span class="type-badge type-${node.branch_type}">${node.branch_type}</span>
                         </p>
                         ${node.llm_explanation ? `<p class="llm-explanation">${node.llm_explanation}</p>` : ''}
-                    </div>`;
+                    </details>`;
             } else {
                 llmHtml = `
-                    <div class="llm-info-box">
-                        <div class="llm-info-header"><span class="llm-label">LLM Analysis</span></div>
+                    <details class="llm-info-box">
+                        <summary class="llm-label">LLM Analysis</summary>
                         <p>Type: <span class="type-badge type-${node.llm_proposed_type}">${node.llm_proposed_type}</span> (confirmed)</p>
                         ${node.llm_explanation ? `<p class="llm-explanation">${node.llm_explanation}</p>` : ''}
-                    </div>`;
+                    </details>`;
             }
         }
 
@@ -242,10 +242,10 @@
             </div>
             <div class="node-body" style="font-size:0.95rem;line-height:1.65;">${node.body}</div>
             ${node.lineage_desc ? `
-                <div class="lineage-box" style="margin-top:0.75rem;">
-                    <span class="lineage-label">Lineage:</span>
+                <details class="lineage-box" style="margin-top:0.75rem;">
+                    <summary class="lineage-label">Lineage</summary>
                     <em>${node.lineage_desc}</em>
-                </div>` : ''}
+                </details>` : ''}
             ${llmHtml}
             <div style="margin-top:0.75rem;">
                 <a href="/node/${node.id}" class="btn btn-secondary" style="text-align:center;display:block;">

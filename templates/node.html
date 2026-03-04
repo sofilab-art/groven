@@ -46,18 +46,16 @@
 
         <!-- Lineage description -->
         {% if node.lineage_desc %}
-        <div class="lineage-box">
-            <span class="lineage-label">Lineage:</span>
+        <details class="lineage-box">
+            <summary class="lineage-label">Lineage</summary>
             <em>{{ node.lineage_desc }}</em>
-        </div>
+        </details>
         {% endif %}
 
         <!-- LLM Box -->
         {% if node.llm_proposed_type %}
-        <div class="llm-info-box {% if node.contested %}llm-info-contested{% endif %}">
-            <div class="llm-info-header">
-                <span class="llm-label">LLM Analysis</span>
-            </div>
+        <details class="llm-info-box {% if node.contested %}llm-info-contested{% endif %}">
+            <summary class="llm-label">LLM Analysis</summary>
             {% if node.contested %}
             <p class="contested-info">
                 LLM proposed <span class="type-badge type-{{ node.llm_proposed_type }}">{{ node.llm_proposed_type }}</span>
@@ -69,7 +67,7 @@
             {% if node.llm_explanation %}
             <p class="llm-explanation">{{ node.llm_explanation }}</p>
             {% endif %}
-        </div>
+        </details>
         {% endif %}
 
         <!-- Children -->

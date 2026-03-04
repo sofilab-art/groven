@@ -730,14 +730,51 @@ a:hover {
     margin-bottom: 1.5rem;
 }
 
+/* Disclosure boxes (details/summary) — shared */
+
+details.lineage-box,
+details.llm-info-box {
+    border-radius: 0 8px 8px 0;
+    padding: 0.45rem 0.85rem;
+    margin-bottom: 0.75rem;
+}
+
+details.lineage-box > summary,
+details.llm-info-box > summary {
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+details.lineage-box > summary::before,
+details.llm-info-box > summary::before {
+    content: '\25B6';
+    font-size: 0.55rem;
+    color: var(--leaf);
+    transition: transform 0.15s;
+}
+
+details[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+details.lineage-box > summary::-webkit-details-marker,
+details.llm-info-box > summary::-webkit-details-marker {
+    display: none;
+}
+
+details[open].lineage-box,
+details[open].llm-info-box {
+    padding-bottom: 0.6rem;
+}
+
 /* Lineage Box */
 
 .lineage-box {
     background: rgba(116,198,157,0.08);
     border-left: 3px solid var(--mint);
-    border-radius: 0 8px 8px 0;
-    padding: 0.6rem 0.85rem;
-    margin-bottom: 1rem;
 }
 
 .lineage-label {
@@ -746,11 +783,11 @@ a:hover {
     color: var(--leaf);
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    display: block;
-    margin-bottom: 0.25rem;
 }
 
 .lineage-box em {
+    display: block;
+    margin-top: 0.35rem;
     font-size: 0.8rem;
     color: var(--text-mid);
     line-height: 1.45;
@@ -761,9 +798,6 @@ a:hover {
 .llm-info-box {
     background: var(--cream);
     border-left: 3px solid var(--mint);
-    border-radius: 0 8px 8px 0;
-    padding: 0.6rem 0.85rem;
-    margin-bottom: 1rem;
 }
 
 .llm-info-contested {
@@ -771,18 +805,16 @@ a:hover {
     background: rgba(212,163,115,0.06);
 }
 
-.llm-info-header {
-    margin-bottom: 0.25rem;
-}
-
 .llm-info-box p {
     font-size: 0.8rem;
     line-height: 1.45;
+    margin-top: 0.35rem;
 }
 
 .contested-info {
     font-size: 0.8rem;
-    margin-bottom: 0.35rem;
+    margin-top: 0.35rem;
+    margin-bottom: 0.2rem;
     display: flex;
     align-items: center;
     flex-wrap: wrap;
