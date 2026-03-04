@@ -1,0 +1,273 @@
+/**
+ * Groven — Forest Graph Visualization
+ * D3.js v7 force-directed graph
+ */
+
+(function () {
+    const container = document.getElementById('forest-graph');
+    if (!container) return;
+
+    const spaceId = container.dataset.spaceId;
+    if (!spaceId) return;
+
+    // Color map for branch types
+    const typeColors = {
+        seed: '#1B4332',
+        clarification: '#3B82F6',
+        extension: '#40916C',
+        reframing: '#D4A373',
+        contradiction: '#EF4444',
+        synthesis: '#8B5CF6'
+    };
+
+    const width = container.clientWidth || 800;
+    const height = container.clientHeight || 600;
+
+    // Create SVG
+    const svg = d3.select(container)
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .attr('viewBox', [0, 0, width, height]);
+
+    // Arrow marker
+    svg.append('defs').append('marker')
+        .attr('id', 'arrowhead')
+        .attr('viewBox', '0 -5 10 10')
+        .attr('refX', 20)
+        .attr('refY', 0)
+        .attr('markerWidth', 6)
+        .attr('markerHeight', 6)
+        .attr('orient', 'auto')
+        .append('path')
+        .attr('d', 'M0,-5L10,0L0,5')
+        .attr('fill', '#2D6A4F')
+        .attr('opacity', 0.5);
+
+    // Tooltip
+    const tooltip = d3.select(container)
+        .append('div')
+        .attr('class', 'graph-tooltip')
+        .style('display', 'none');
+
+    // Container group for zoom
+    const g = svg.append('g');
+
+    // Zoom behavior
+    const zoom = d3.zoom()
+        .scaleExtent([0.3, 3])
+        .on('zoom', (event) => {
+            g.attr('transform', event.transform);
+        });
+    svg.call(zoom);
+
+    // Fetch and render
+    fetch(`/api/tree/${spaceId}`)
+        .then(r => r.json())
+        .then(nodes => {
+            if (!nodes || nodes.length === 0) return;
+
+            // Build links from parent_id
+            const links = nodes
+                .filter(n => n.parent_id)
+                .map(n => ({
+                    source: n.parent_id,
+                    target: n.id
+                }));
+
+            // Create simulation
+            const simulation = d3.forceSimulation(nodes)
+                .force('link', d3.forceLink(links)
+                    .id(d => d.id)
+                    .distance(120))
+                .force('charge', d3.forceManyBody().strength(-300))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collision', d3.forceCollide().radius(d =>
+                    d.node_type === 'seed' ? 28 : 22));
+
+            // Draw links
+            const link = g.append('g')
+                .selectAll('line')
+                .data(links)
+                .join('line')
+                .attr('stroke', '#2D6A4F')
+                .attr('stroke-opacity', 0.4)
+                .attr('stroke-width', 1.5)
+                .attr('marker-end', 'url(#arrowhead)');
+
+            // Draw node groups
+            const nodeGroup = g.append('g')
+                .selectAll('g')
+                .data(nodes)
+                .join('g')
+                .style('cursor', 'pointer')
+                .call(d3.drag()
+                    .on('start', dragstarted)
+                    .on('drag', dragged)
+                    .on('end', dragended));
+
+            // Node circles
+            nodeGroup.append('circle')
+                .attr('r', d => d.node_type === 'seed' ? 18 : 12)
+                .attr('fill', d => {
+                    if (d.node_type === 'seed') return typeColors.seed;
+                    return typeColors[d.branch_type] || '#999';
+                })
+                .attr('stroke', d => d.contested ? '#D4A373' : 'rgba(0,0,0,0.1)')
+                .attr('stroke-width', d => d.contested ? 2.5 : 1)
+                .attr('stroke-dasharray', d => d.contested ? '4,3' : 'none');
+
+            // Author labels
+            nodeGroup.append('text')
+                .text(d => d.author)
+                .attr('dy', d => (d.node_type === 'seed' ? 30 : 24))
+                .attr('text-anchor', 'middle')
+                .attr('font-size', '10px')
+                .attr('font-family', 'Outfit, sans-serif')
+                .attr('fill', '#374151')
+                .attr('font-weight', '400');
+
+            // Hover events
+            nodeGroup
+                .on('mouseenter', (event, d) => {
+                    const typeLabel = d.branch_type || 'seed';
+                    const bodyPreview = d.body.length > 80
+                        ? d.body.substring(0, 80) + '...'
+                        : d.body;
+
+                    tooltip
+                        .style('display', 'block')
+                        .html(`
+                            <span class="tt-author">${d.author}</span>
+                            <span class="tt-type type-badge type-${typeLabel}">${typeLabel}</span>
+                            <div class="tt-body">${bodyPreview}</div>
+                        `);
+                })
+                .on('mousemove', (event) => {
+                    const rect = container.getBoundingClientRect();
+                    tooltip
+                        .style('left', (event.clientX - rect.left + 12) + 'px')
+                        .style('top', (event.clientY - rect.top - 10) + 'px');
+                })
+                .on('mouseleave', () => {
+                    tooltip.style('display', 'none');
+                });
+
+            // Click: show detail
+            nodeGroup.on('click', (event, d) => {
+                event.stopPropagation();
+                showNodeDetail(d);
+            });
+
+            // Simulation tick
+            simulation.on('tick', () => {
+                link
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+
+                nodeGroup.attr('transform', d => `translate(${d.x},${d.y})`);
+            });
+
+            // Drag functions
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+
+            function dragended(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+
+            // Store simulation globally for updates
+            window._groven_simulation = simulation;
+            window._groven_nodes = nodes;
+            window._groven_links = links;
+        })
+        .catch(err => {
+            console.error('[Graph] Failed to load tree:', err);
+            container.innerHTML = '<p style="padding:2rem;color:#999;">Graph konnte nicht geladen werden.</p>';
+        });
+
+    // Show node detail in the right panel
+    function showNodeDetail(node) {
+        const panel = document.getElementById('node-detail');
+        const content = document.getElementById('node-detail-content');
+        if (!panel || !content) return;
+
+        const typeLabel = node.branch_type || 'seed';
+        const contested = node.contested
+            ? '<span class="contested-badge">Contested</span>'
+            : '';
+
+        let llmHtml = '';
+        if (node.llm_proposed_type) {
+            if (node.contested) {
+                llmHtml = `
+                    <div class="llm-info-box llm-info-contested">
+                        <div class="llm-info-header"><span class="llm-label">LLM-Analyse</span></div>
+                        <p class="contested-info">
+                            LLM schlug <span class="type-badge type-${node.llm_proposed_type}">${node.llm_proposed_type}</span> vor
+                            — Autor wählte <span class="type-badge type-${node.branch_type}">${node.branch_type}</span>
+                        </p>
+                        ${node.llm_explanation ? `<p class="llm-explanation">${node.llm_explanation}</p>` : ''}
+                    </div>`;
+            } else {
+                llmHtml = `
+                    <div class="llm-info-box">
+                        <div class="llm-info-header"><span class="llm-label">LLM-Analyse</span></div>
+                        <p>Typ: <span class="type-badge type-${node.llm_proposed_type}">${node.llm_proposed_type}</span> (bestätigt)</p>
+                        ${node.llm_explanation ? `<p class="llm-explanation">${node.llm_explanation}</p>` : ''}
+                    </div>`;
+            }
+        }
+
+        content.innerHTML = `
+            <div class="node-header-badges">
+                <span class="type-badge type-${typeLabel}">${typeLabel}</span>
+                ${contested}
+            </div>
+            <h3 style="margin:0.5rem 0;color:#1B4332;">${node.title || 'Beitrag von ' + node.author}</h3>
+            <div class="node-meta" style="margin-bottom:0.75rem;">
+                <span>von <strong>${node.author}</strong></span>
+            </div>
+            <div class="node-body" style="font-size:0.88rem;">${node.body}</div>
+            ${node.lineage_desc ? `
+                <div class="lineage-box" style="margin-top:0.75rem;">
+                    <span class="lineage-label">Lineage:</span>
+                    <em>${node.lineage_desc}</em>
+                </div>` : ''}
+            ${llmHtml}
+            <div style="margin-top:0.75rem;">
+                <a href="/node/${node.id}" class="btn btn-secondary" style="text-align:center;display:block;">
+                    Zur Detailansicht &rarr;
+                </a>
+            </div>
+        `;
+
+        panel.style.display = 'block';
+    }
+
+    // Close detail
+    const closeBtn = document.getElementById('close-detail');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            document.getElementById('node-detail').style.display = 'none';
+        });
+    }
+
+    // Make reload function available
+    window.reloadGraph = function () {
+        // Simple: reload the page. Better: refetch and update D3.
+        location.reload();
+    };
+})();

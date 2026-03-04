@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Groven — Prototype{% endblock %}
+
+{% block content %}
+<div class="index-page">
+    <header class="index-header">
+        <h1>Groven <span class="subtitle">— Prototype</span></h1>
+        <p class="index-desc">Structured deliberation. Every contribution is typed, every connection visible.</p>
+    </header>
+
+    <div class="space-grid">
+        {% for space in spaces %}
+        <a href="/space/{{ space.id }}" class="space-card">
+            <div class="space-card-header">
+                <h2>{{ space.title }}</h2>
+                <span class="status-badge status-{{ space.status }}">{{ space.status }}</span>
+            </div>
+            <p class="space-card-desc">{{ space.description }}</p>
+            <div class="space-card-meta">
+                <span class="node-count">{{ space.node_count }} Nodes</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

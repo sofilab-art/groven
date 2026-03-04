@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}{{ space.title }} — Groven{% endblock %}
+
+{% block content %}
+<div class="space-page">
+    <header class="space-header">
+        <div>
+            <h1>{{ space.title }}</h1>
+            <p class="space-desc">{{ space.description }}</p>
+        </div>
+        <span class="status-badge status-{{ space.status }}">{{ space.status }}</span>
+    </header>
+
+    <div class="space-layout">
+        <!-- Left: Graph -->
+        <div class="graph-panel">
+            <div id="forest-graph" data-space-id="{{ space.id }}"></div>
+        </div>
+
+        <!-- Right: Form + Node List -->
+        <div class="form-panel">
+            <!-- Node Detail (shown when clicking a graph node) -->
+            <div id="node-detail" class="node-detail-panel" style="display:none;">
+                <button id="close-detail" class="close-btn">&times;</button>
+                <div id="node-detail-content"></div>
+            </div>
+
+            <!-- Contribution Form -->
+            <div id="contribution-form-wrapper">
+                <h3>Beitrag hinzufügen</h3>
+                <form id="contribution-form" data-space-id="{{ space.id }}">
+                    <!-- Seed vs Branch toggle -->
+                    <div class="form-toggle">
+                        <label class="toggle-option">
+                            <input type="radio" name="contribution_type" value="seed" checked>
+                            <span>Neuer Seed</span>
+                        </label>
+                        <label class="toggle-option">
+                            <input type="radio" name="contribution_type" value="branch">
+                            <span>Neuer Branch</span>
+                        </label>
+                    </div>
+
+                    <!-- Parent selector (branch only) -->
+                    <div id="branch-fields" style="display:none;">
+                        <div class="form-group">
+                            <label for="parent-select">Parent Node</label>
+                            <select id="parent-select" name="parent_id">
+                                <option value="">— Wähle eine Node —</option>
+                                {% for node in nodes %}
+                                <option value="{{ node.id }}">
+                                    {{ node.author }}: {{ node.title or node.body[:60] }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="author-input">Autor</label>
+                        <input type="text" id="author-input" name="author" required placeholder="Dein Name">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="title-input">Titel <span class="optional">(optional)</span></label>
+                        <input type="text" id="title-input" name="title" placeholder="Kurze Überschrift">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="body-input">Beitrag</label>
+                        <textarea id="body-input" name="body" required rows="5"
+                                  placeholder="Dein Beitrag..."></textarea>
+                    </div>
+
+                    <!-- Lineage desc (branch only) -->
+                    <div id="lineage-field" style="display:none;">
+                        <div class="form-group">
+                            <label for="lineage-input">Lineage-Beschreibung
+                                <span class="label-hint">What does this build on, and where does it take the argument?</span>
+                            </label>
+                            <textarea id="lineage-input" name="lineage_desc" rows="3"
+                                      placeholder="Worauf baut dieser Branch auf, und wohin führt er das Argument?"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- LLM Proposal Section (branch only) -->
+                    <div id="llm-section" style="display:none;">
+                        <button type="button" id="llm-propose-btn" class="btn btn-secondary">
+                            LLM-Vorschlag anfordern
+                        </button>
+                        <div id="llm-spinner" class="spinner" style="display:none;">
+                            <div class="spinner-dot"></div>
+                            Analysiere...
+                        </div>
+                        <div id="llm-result" style="display:none;">
+                            <div class="llm-proposal-card">
+                                <div class="llm-proposal-header">
+                                    <span class="llm-label">LLM-Vorschlag:</span>
+                                    <span id="llm-proposed-type" class="type-badge"></span>
+                                </div>
+                                <p id="llm-explanation" class="llm-explanation"></p>
+                                <div id="llm-confidence" class="llm-confidence"></div>
+                            </div>
+                            <div class="type-choice">
+                                <label class="type-label">Typ bestätigen oder überstimmen:</label>
+                                <div class="type-radio-group" id="type-radio-group">
+                                    <label class="type-radio">
+                                        <input type="radio" name="branch_type" value="clarification">
+                                        <span class="type-pill type-clarification">Clarification</span>
+                                    </label>
+                                    <label class="type-radio">
+                                        <input type="radio" name="branch_type" value="extension">
+                                        <span class="type-pill type-extension">Extension</span>
+                                    </label>
+                                    <label class="type-radio">
+                                        <input type="radio" name="branch_type" value="reframing">
+                                        <span class="type-pill type-reframing">Reframing</span>
+                                    </label>
+                                    <label class="type-radio">
+                                        <input type="radio" name="branch_type" value="contradiction">
+                                        <span class="type-pill type-contradiction">Contradiction</span>
+                                    </label>
+                                    <label class="type-radio">
+                                        <input type="radio" name="branch_type" value="synthesis">
+                                        <span class="type-pill type-synthesis">Synthesis</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hidden fields for LLM data -->
+                    <input type="hidden" id="llm-proposed-type-hidden" name="llm_proposed_type" value="">
+                    <input type="hidden" id="llm-explanation-hidden" name="llm_explanation" value="">
+
+                    <button type="submit" id="submit-btn" class="btn btn-primary">Beitrag absenden</button>
+                </form>
+            </div>
+
+            <!-- Node List -->
+            <div class="node-list">
+                <h3>Alle Beiträge</h3>
+                <div id="node-list-items">
+                    {% for node in nodes %}
+                    <a href="/node/{{ node.id }}" class="node-list-item {% if node.contested %}contested{% endif %}">
+                        <div class="node-list-header">
+                            <span class="node-author">{{ node.author }}</span>
+                            {% if node.branch_type %}
+                            <span class="type-badge type-{{ node.branch_type }}">{{ node.branch_type }}</span>
+                            {% else %}
+                            <span class="type-badge type-seed">Seed</span>
+                            {% endif %}
+                        </div>
+                        <p class="node-list-body">{{ node.body[:100] }}{% if node.body|length > 100 %}...{% endif %}</p>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="{{ url_for('static', filename='graph.js') }}"></script>
+{% endblock %}

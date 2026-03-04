@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}{{ node.title or node.body[:40] }} — Groven{% endblock %}
+
+{% block content %}
+<div class="node-page">
+    <!-- Breadcrumb: lineage path -->
+    <nav class="breadcrumb">
+        <a href="/">Groven</a>
+        <span class="sep">›</span>
+        <a href="/space/{{ space.id }}">{{ space.title|truncate(40) }}</a>
+        {% for ancestor in ancestors %}
+        <span class="sep">›</span>
+        {% if ancestor.id == node.id %}
+        <span class="current">{{ ancestor.title or ancestor.author }}</span>
+        {% else %}
+        <a href="/node/{{ ancestor.id }}">{{ ancestor.title or ancestor.author }}</a>
+        {% endif %}
+        {% endfor %}
+    </nav>
+
+    <article class="node-detail">
+        <!-- Header -->
+        <header class="node-header">
+            <div class="node-header-badges">
+                {% if node.branch_type %}
+                <span class="type-badge type-{{ node.branch_type }}">{{ node.branch_type }}</span>
+                {% else %}
+                <span class="type-badge type-seed">Seed</span>
+                {% endif %}
+                {% if node.contested %}
+                <span class="contested-badge">Contested</span>
+                {% endif %}
+            </div>
+            <h1>{{ node.title or "Beitrag von " + node.author }}</h1>
+            <div class="node-meta">
+                <span class="node-author-label">von <strong>{{ node.author }}</strong></span>
+                <span class="node-date">{{ node.created_at }}</span>
+            </div>
+        </header>
+
+        <!-- Body -->
+        <div class="node-body">
+            {{ node.body }}
+        </div>
+
+        <!-- Lineage description -->
+        {% if node.lineage_desc %}
+        <div class="lineage-box">
+            <span class="lineage-label">Lineage:</span>
+            <em>{{ node.lineage_desc }}</em>
+        </div>
+        {% endif %}
+
+        <!-- LLM Box -->
+        {% if node.llm_proposed_type %}
+        <div class="llm-info-box {% if node.contested %}llm-info-contested{% endif %}">
+            <div class="llm-info-header">
+                <span class="llm-label">LLM-Analyse</span>
+            </div>
+            {% if node.contested %}
+            <p class="contested-info">
+                LLM schlug <span class="type-badge type-{{ node.llm_proposed_type }}">{{ node.llm_proposed_type }}</span> vor
+                — Autor wählte <span class="type-badge type-{{ node.branch_type }}">{{ node.branch_type }}</span>
+            </p>
+            {% else %}
+            <p>Vorgeschlagener Typ: <span class="type-badge type-{{ node.llm_proposed_type }}">{{ node.llm_proposed_type }}</span> (bestätigt)</p>
+            {% endif %}
+            {% if node.llm_explanation %}
+            <p class="llm-explanation">{{ node.llm_explanation }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Children -->
+        {% if children %}
+        <div class="children-section">
+            <h2>Branches ({{ children|length }})</h2>
+            <div class="children-list">
+                {% for child in children %}
+                <a href="/node/{{ child.id }}" class="node-list-item {% if child.contested %}contested{% endif %}">
+                    <div class="node-list-header">
+                        <span class="node-author">{{ child.author }}</span>
+                        {% if child.branch_type %}
+                        <span class="type-badge type-{{ child.branch_type }}">{{ child.branch_type }}</span>
+                        {% endif %}
+                        {% if child.contested %}
+                        <span class="contested-badge">Contested</span>
+                        {% endif %}
+                    </div>
+                    {% if child.title %}
+                    <strong>{{ child.title }}</strong>
+                    {% endif %}
+                    <p class="node-list-body">{{ child.body[:100] }}{% if child.body|length > 100 %}...{% endif %}</p>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="back-link">
+            <a href="/space/{{ space.id }}">&larr; Zurück zum Space</a>
+        </div>
+    </article>
+</div>
+{% endblock %}
