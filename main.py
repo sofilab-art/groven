@@ -199,6 +199,48 @@ def api_preview_node():
     })
 
 
+@app.route("/api/node/reclassify", methods=["POST"])
+def api_reclassify_node():
+    """Re-analyse a branch after the author overrides the classification."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON body"}), 400
+
+    parent_id = data.get("parent_id")
+    body = (data.get("body") or "").strip()
+    chosen_type = (data.get("chosen_type") or "").strip()
+    original_type = data.get("original_type")
+    original_explanation = data.get("original_explanation")
+
+    if not parent_id or not body or not chosen_type:
+        return jsonify({"error": "parent_id, body, and chosen_type are required"}), 400
+
+    parent_node = db.get_node(parent_id)
+    if not parent_node:
+        return jsonify({"error": "Parent node not found"}), 404
+
+    result = llm.reclassify(
+        parent_body=parent_node["body"],
+        branch_body=body,
+        original_type=original_type,
+        original_explanation=original_explanation,
+        chosen_type=chosen_type
+    )
+
+    if result:
+        return jsonify({
+            "explanation": result.get("explanation", ""),
+            "lineage_desc": result.get("lineage_desc", ""),
+            "suggested_title": result.get("suggested_title", "")
+        })
+    else:
+        return jsonify({
+            "explanation": "",
+            "lineage_desc": "",
+            "suggested_title": ""
+        })
+
+
 @app.route("/api/llm-propose")
 def api_llm_propose():
     """Get LLM type proposal for a branch."""

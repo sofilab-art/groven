@@ -199,6 +199,51 @@
             }
         });
 
+        // Reclassify when the user picks a different type
+        let reclassifyController = null;
+        reviewModal.querySelectorAll('input[name="review_branch_type"]').forEach(radio => {
+            radio.addEventListener('change', async () => {
+                const preview = reviewModal._preview;
+                const payload = reviewModal._payload;
+                if (!preview || !payload) return;
+
+                // Skip if user picked the same type as LLM proposed
+                if (radio.value === preview.proposed_type) return;
+
+                // Abort any in-flight reclassify request
+                if (reclassifyController) reclassifyController.abort();
+                reclassifyController = new AbortController();
+
+                // Show loading state — only reasoning updates, title/lineage stay neutral
+                const explanationEl = document.getElementById('review-explanation');
+                const confidenceEl = document.getElementById('review-confidence');
+                explanationEl.textContent = 'Rethinking...';
+                confidenceEl.textContent = '';
+
+                try {
+                    const resp = await fetch('/api/node/reclassify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            parent_id: payload.parent_id,
+                            body: payload.body,
+                            chosen_type: radio.value,
+                            original_type: preview.proposed_type,
+                            original_explanation: preview.explanation
+                        }),
+                        signal: reclassifyController.signal
+                    });
+
+                    const data = await resp.json();
+                    if (data.explanation) explanationEl.textContent = data.explanation;
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error('[Reclassify] Error:', err);
+                    }
+                }
+            });
+        });
+
         document.getElementById('review-confirm').addEventListener('click', async () => {
             const payload = reviewModal._payload;
             const preview = reviewModal._preview;

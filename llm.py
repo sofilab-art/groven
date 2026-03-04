@@ -201,3 +201,80 @@ def generate_title(parent_body, branch_body, branch_type):
     except Exception as e:
         print(f"[LLM] Title generation error: {e}")
         return "Untitled branch"
+
+
+RECLASSIFY_SYSTEM_PROMPT = """You are a semantic classification assistant for Groven,
+a structured deliberation platform.
+
+The author of a Branch disagrees with the initial classification and has chosen a different type.
+Your task: reconsider the classification from the author's perspective and explain why the author's
+chosen type is a reasonable reading.
+
+The five Branch types are:
+- clarification: sharpens or makes precise what the parent said, without adding new content
+- extension: builds on and supports the parent's direction, carrying it into new territory; does NOT raise objections
+- reframing: same observation, fundamentally different interpretive angle; does not contradict
+- contradiction: challenges, objects to, or undermines the parent's proposal; includes raising concerns or practical problems
+- synthesis: connects two or more existing lines of thought; reconciles divergent Branches
+
+Respond ONLY with valid JSON:
+{
+  "explanation": "<exactly three sentences: first sentence briefly states the original classification and why it was proposed; second sentence states that the author chose a different type; third sentence explains why the author's reading is reasonable and how the contribution should be interpreted under that type>"
+}"""
+
+RECLASSIFY_USER_TEMPLATE = """Parent node:
+---
+{parent_body}
+---
+
+New Branch:
+---
+{branch_body}
+---
+
+The LLM initially classified this as: {original_type}
+Original reasoning: {original_explanation}
+
+The author chose: {chosen_type}
+
+Reconsider the analysis from the author's perspective."""
+
+
+def reclassify(parent_body, branch_body, original_type, original_explanation, chosen_type):
+    """
+    Re-analyse a branch after the author overrides the classification.
+    Returns dict: {explanation, lineage_desc, suggested_title}
+    Returns None on error.
+    """
+    try:
+        cl = _get_client()
+        user_message = RECLASSIFY_USER_TEMPLATE.format(
+            parent_body=parent_body,
+            branch_body=branch_body,
+            original_type=original_type or "unknown",
+            original_explanation=original_explanation or "(none)",
+            chosen_type=chosen_type
+        )
+
+        response = cl.chat.completions.create(
+            model="gpt-5-mini",
+            messages=[
+                {"role": "system", "content": RECLASSIFY_SYSTEM_PROMPT},
+                {"role": "user", "content": user_message}
+            ],
+            max_completion_tokens=2048,
+            timeout=15
+        )
+
+        content = response.choices[0].message.content.strip()
+        if content.startswith("```"):
+            content = content.split("\n", 1)[1] if "\n" in content else content[3:]
+            if content.endswith("```"):
+                content = content[:-3]
+            content = content.strip()
+
+        return json.loads(content)
+
+    except Exception as e:
+        print(f"[LLM] Reclassify error: {e}")
+        return None
