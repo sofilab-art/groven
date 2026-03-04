@@ -67,36 +67,51 @@ def api_create_node():
     author = (data.get("author") or "").strip()
     body = (data.get("body") or "").strip()
     parent_id = data.get("parent_id")
-    title = (data.get("title") or "").strip() or None
-    lineage_desc = (data.get("lineage_desc") or "").strip() or None
-    branch_type = data.get("branch_type")
-    llm_proposed_type = data.get("llm_proposed_type")
-    llm_explanation = data.get("llm_explanation")
+    title = (data.get("title") or "").strip()
 
     # Validation
-    if not space_id or not author or not body:
-        return jsonify({"error": "space_id, author, and body are required"}), 400
+    if not space_id or not author or not title or not body:
+        return jsonify({"error": "space_id, author, title, and body are required"}), 400
 
     if not db.get_space(space_id):
         return jsonify({"error": "Space not found"}), 404
 
     # Determine node type
+    branch_type = None
+    llm_proposed_type = None
+    llm_explanation = None
+    lineage_desc = None
+    contested = 0
+
     if parent_id:
         node_type = "branch"
-        if not lineage_desc:
-            return jsonify({"error": "lineage_desc is required for branches"}), 400
-        if not branch_type:
-            return jsonify({"error": "branch_type is required for branches"}), 400
-        if not db.get_node(parent_id):
+        parent_node = db.get_node(parent_id)
+        if not parent_node:
             return jsonify({"error": "Parent node not found"}), 404
+
+        # Auto-classify branch type via LLM
+        proposal = llm.propose_branch_type(
+            parent_body=parent_node["body"],
+            branch_body=body,
+            lineage_desc=None
+        )
+        if proposal:
+            branch_type = proposal["proposed_type"]
+            llm_proposed_type = proposal["proposed_type"]
+            llm_explanation = proposal.get("explanation")
+        else:
+            # Fallback if LLM is unavailable
+            branch_type = "extension"
+            llm_proposed_type = None
+
+        # Auto-generate lineage description
+        lineage_desc = llm.generate_lineage(
+            parent_body=parent_node["body"],
+            branch_body=body,
+            branch_type=branch_type
+        )
     else:
         node_type = "seed"
-        branch_type = None
-
-    # Calculate contested flag
-    contested = 0
-    if llm_proposed_type and branch_type and llm_proposed_type != branch_type:
-        contested = 1
 
     node_id = db.create_node(
         space_id=space_id,
@@ -125,7 +140,6 @@ def api_llm_propose():
     """Get LLM type proposal for a branch."""
     parent_id = request.args.get("parent_id")
     body = request.args.get("body", "").strip()
-    lineage_desc = request.args.get("lineage_desc", "").strip()
 
     if not parent_id or not body:
         return jsonify({"error": "parent_id and body are required"}), 400
@@ -137,7 +151,7 @@ def api_llm_propose():
     result = llm.propose_branch_type(
         parent_body=parent["body"],
         branch_body=body,
-        lineage_desc=lineage_desc
+        lineage_desc=None
     )
 
     if result is None:

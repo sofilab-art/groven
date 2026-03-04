@@ -97,3 +97,56 @@ def propose_branch_type(parent_body, branch_body, lineage_desc):
     except Exception as e:
         print(f"[LLM] Error: {e}")
         return None
+
+
+LINEAGE_SYSTEM_PROMPT = """You are a lineage summariser for Groven, a structured deliberation platform.
+
+Given a parent contribution and a new branch contribution, write a one-sentence lineage description.
+The sentence should explain what the branch builds on from the parent and where it takes the argument.
+
+Respond ONLY with the single sentence, no quotes, no preamble."""
+
+LINEAGE_USER_TEMPLATE = """Parent contribution:
+---
+{parent_body}
+---
+
+New branch:
+---
+{branch_body}
+---
+
+Branch type: {branch_type}
+
+Write a one-sentence lineage description."""
+
+
+def generate_lineage(parent_body, branch_body, branch_type):
+    """
+    Auto-generate a lineage description using gpt-4o-mini.
+    Returns a string, or a fallback sentence on error.
+    """
+    try:
+        cl = _get_client()
+        user_message = LINEAGE_USER_TEMPLATE.format(
+            parent_body=parent_body,
+            branch_body=branch_body,
+            branch_type=branch_type or "unknown"
+        )
+
+        response = cl.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": LINEAGE_SYSTEM_PROMPT},
+                {"role": "user", "content": user_message}
+            ],
+            temperature=0.3,
+            max_tokens=120,
+            timeout=8
+        )
+
+        return response.choices[0].message.content.strip()
+
+    except Exception as e:
+        print(f"[LLM] Lineage generation error: {e}")
+        return "Builds on the parent contribution."

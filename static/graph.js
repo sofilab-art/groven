@@ -21,14 +21,14 @@
     };
 
     const width = container.clientWidth || 800;
-    const height = container.clientHeight || 600;
+    // Fixed simulation height — keeps nodes stable in the upper part of the panel
+    const height = 600;
 
-    // Create SVG
+    // Create SVG — anchored to top via preserveAspectRatio
     const svg = d3.select(container)
         .append('svg')
-        .attr('width', width)
-        .attr('height', height)
-        .attr('viewBox', [0, 0, width, height]);
+        .attr('viewBox', [0, 0, width, height])
+        .attr('preserveAspectRatio', 'xMidYMin meet');
 
     // Arrow marker
     svg.append('defs').append('marker')
@@ -44,8 +44,8 @@
         .attr('fill', '#2D6A4F')
         .attr('opacity', 0.5);
 
-    // Tooltip
-    const tooltip = d3.select(container)
+    // Tooltip — appended to body so it's never clipped by overflow:hidden
+    const tooltip = d3.select('body')
         .append('div')
         .attr('class', 'graph-tooltip')
         .style('display', 'none');
@@ -117,50 +117,63 @@
                 .attr('stroke-width', d => d.contested ? 2.5 : 1)
                 .attr('stroke-dasharray', d => d.contested ? '4,3' : 'none');
 
-            // Author labels
+            // Title labels
             nodeGroup.append('text')
-                .text(d => d.author)
+                .text(d => {
+                    const label = d.title || d.author;
+                    return label.length > 25 ? label.substring(0, 23) + '...' : label;
+                })
                 .attr('dy', d => (d.node_type === 'seed' ? 30 : 24))
                 .attr('text-anchor', 'middle')
                 .attr('font-size', '10px')
                 .attr('font-family', 'Outfit, sans-serif')
                 .attr('fill', '#374151')
-                .attr('font-weight', '400');
+                .attr('font-weight', d => d.title ? '500' : '400');
 
             // Hover events
             nodeGroup
                 .on('mouseenter', (event, d) => {
                     const typeLabel = d.branch_type || 'seed';
-                    const bodyPreview = d.body.length > 80
-                        ? d.body.substring(0, 80) + '...'
-                        : d.body;
+                    const titleHtml = d.title
+                        ? `<div class="tt-title">${d.title}</div>`
+                        : '';
 
                     tooltip
                         .style('display', 'block')
                         .html(`
                             <span class="tt-author">${d.author}</span>
                             <span class="tt-type type-badge type-${typeLabel}">${typeLabel}</span>
-                            <div class="tt-body">${bodyPreview}</div>
+                            ${titleHtml}
+                            <div class="tt-body">${d.body}</div>
                         `);
                 })
                 .on('mousemove', (event) => {
-                    const rect = container.getBoundingClientRect();
                     tooltip
-                        .style('left', (event.clientX - rect.left + 12) + 'px')
-                        .style('top', (event.clientY - rect.top - 10) + 'px');
+                        .style('left', (event.pageX + 12) + 'px')
+                        .style('top', (event.pageY - 10) + 'px');
                 })
                 .on('mouseleave', () => {
                     tooltip.style('display', 'none');
                 });
 
-            // Click: show detail
+            // Click: show detail + set as parent
             nodeGroup.on('click', (event, d) => {
                 event.stopPropagation();
                 showNodeDetail(d);
+                // Automatically set clicked node as the parent for branching
+                if (window.selectParentNode) {
+                    window.selectParentNode(d.id, d.author, d.title || d.body.substring(0, 50));
+                }
             });
 
-            // Simulation tick
+            // Simulation tick — clamp nodes inside the visible area
+            const pad = 30;
             simulation.on('tick', () => {
+                nodes.forEach(d => {
+                    d.x = Math.max(pad, Math.min(width - pad, d.x));
+                    d.y = Math.max(pad, Math.min(height - pad, d.y));
+                });
+
                 link
                     .attr('x1', d => d.source.x)
                     .attr('y1', d => d.source.y)

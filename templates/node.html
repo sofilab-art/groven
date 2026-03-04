@@ -46,7 +46,7 @@
 
         <!-- Lineage description -->
         {% if node.lineage_desc %}
-        <details class="lineage-box">
+        <details class="lineage-box" open>
             <summary class="lineage-label">Lineage</summary>
             <em>{{ node.lineage_desc }}</em>
         </details>
@@ -54,7 +54,7 @@
 
         <!-- LLM Box -->
         {% if node.llm_proposed_type %}
-        <details class="llm-info-box {% if node.contested %}llm-info-contested{% endif %}">
+        <details class="llm-info-box {% if node.contested %}llm-info-contested{% endif %}" open>
             <summary class="llm-label">LLM Analysis</summary>
             {% if node.contested %}
             <p class="contested-info">

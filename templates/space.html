@@ -33,29 +33,31 @@
                     <!-- Seed vs Branch toggle -->
                     <div class="form-toggle">
                         <label class="toggle-option">
-                            <input type="radio" name="contribution_type" value="seed">
-                            <span>Start a new argument</span>
+                            <input type="radio" name="contribution_type" value="seed" checked>
+                            <span>Plant a new seed</span>
                         </label>
                         <label class="toggle-option">
-                            <input type="radio" name="contribution_type" value="branch" checked>
-                            <span>Respond to an existing argument</span>
+                            <input type="radio" name="contribution_type" value="branch">
+                            <span>Grow a new branch</span>
                         </label>
                     </div>
 
-                    <!-- Parent selector (branch only) -->
-                    <div id="branch-fields" style="display:none;">
-                        <div class="form-group">
-                            <label for="parent-select">Parent Node</label>
-                            <select id="parent-select" name="parent_id">
-                                <option value="">— Select a node —</option>
-                                {% for node in nodes %}
-                                <option value="{{ node.id }}">
-                                    {{ node.author }}: {{ node.title or node.body[:60] }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
+                    <!-- Parent indicator (set by clicking a graph node) -->
+                    <div id="parent-indicator" class="parent-indicator" style="display:none;">
+                        <span class="parent-indicator-label">Branching from:</span>
+                        <span id="parent-indicator-name" class="parent-indicator-name"></span>
+                        <button type="button" id="clear-parent" class="parent-indicator-clear">&times;</button>
                     </div>
+
+                    <!-- Hidden parent selector (populated by graph click) -->
+                    <select id="parent-select" name="parent_id" style="display:none;">
+                        <option value="">— Select a node —</option>
+                        {% for node in nodes %}
+                        <option value="{{ node.id }}">
+                            {{ node.author }}: {{ node.title or node.body[:60] }}
+                        </option>
+                        {% endfor %}
+                    </select>
 
                     <div class="form-group">
                         <label for="author-input">Author</label>
@@ -63,8 +65,8 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="title-input">Title <span class="optional">(optional)</span></label>
-                        <input type="text" id="title-input" name="title" placeholder="Short headline">
+                        <label for="title-input">Title</label>
+                        <input type="text" id="title-input" name="title" required placeholder="Short headline">
                     </div>
 
                     <div class="form-group">
@@ -72,67 +74,6 @@
                         <textarea id="body-input" name="body" required rows="5"
                                   placeholder="Your contribution..."></textarea>
                     </div>
-
-                    <!-- Lineage desc (branch only) -->
-                    <div id="lineage-field" style="display:none;">
-                        <div class="form-group">
-                            <label for="lineage-input">Lineage description
-                                <span class="label-hint">What does this build on, and where does it take the argument?</span>
-                            </label>
-                            <textarea id="lineage-input" name="lineage_desc" rows="3"
-                                      placeholder="What does this branch build on, and where does it take the argument?"></textarea>
-                        </div>
-                    </div>
-
-                    <!-- LLM Proposal Section (branch only) -->
-                    <div id="llm-section" style="display:none;">
-                        <button type="button" id="llm-propose-btn" class="btn btn-secondary">
-                            Get LLM suggestion
-                        </button>
-                        <div id="llm-spinner" class="spinner" style="display:none;">
-                            <div class="spinner-dot"></div>
-                            Analyzing...
-                        </div>
-                        <div id="llm-result" style="display:none;">
-                            <div class="llm-proposal-card">
-                                <div class="llm-proposal-header">
-                                    <span class="llm-label">LLM suggestion:</span>
-                                    <span id="llm-proposed-type" class="type-badge"></span>
-                                </div>
-                                <p id="llm-explanation" class="llm-explanation"></p>
-                                <div id="llm-confidence" class="llm-confidence"></div>
-                            </div>
-                            <div class="type-choice">
-                                <label class="type-label">Confirm or override type:</label>
-                                <div class="type-radio-group" id="type-radio-group">
-                                    <label class="type-radio">
-                                        <input type="radio" name="branch_type" value="clarification">
-                                        <span class="type-pill type-clarification">Clarification</span>
-                                    </label>
-                                    <label class="type-radio">
-                                        <input type="radio" name="branch_type" value="extension">
-                                        <span class="type-pill type-extension">Extension</span>
-                                    </label>
-                                    <label class="type-radio">
-                                        <input type="radio" name="branch_type" value="reframing">
-                                        <span class="type-pill type-reframing">Reframing</span>
-                                    </label>
-                                    <label class="type-radio">
-                                        <input type="radio" name="branch_type" value="contradiction">
-                                        <span class="type-pill type-contradiction">Contradiction</span>
-                                    </label>
-                                    <label class="type-radio">
-                                        <input type="radio" name="branch_type" value="synthesis">
-                                        <span class="type-pill type-synthesis">Synthesis</span>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Hidden fields for LLM data -->
-                    <input type="hidden" id="llm-proposed-type-hidden" name="llm_proposed_type" value="">
-                    <input type="hidden" id="llm-explanation-hidden" name="llm_explanation" value="">
 
                     <button type="submit" id="submit-btn" class="btn btn-primary">Submit contribution</button>
                 </form>
