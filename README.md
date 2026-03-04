@@ -2,6 +2,8 @@
 
 **Behavioral prototype for structured deliberation.**
 
+**Demo:** https://groven.pythonanywhere.com/
+
 Groven tests a core hypothesis: does typing contributions (clarification, extension, reframing, contradiction, synthesis) change how people contribute to a discussion?
 
 Every contribution is either a **Seed** (a root argument) or a **Branch** (a response to an existing node). Branches carry a semantic type — proposed by an LLM, confirmed or overridden by the author. When the author disagrees with the LLM's classification, the node is marked as **contested**, making disagreement visible in the graph.
@@ -22,13 +24,13 @@ The prototype ships with three pre-loaded discussion spaces in the context of CO
 
 - **Backend:** Python / Flask, SQLite
 - **Frontend:** Vanilla JS, D3.js v7 (CDN)
-- **LLM:** OpenAI API (gpt-4o-mini) for branch type classification
+- **LLM:** OpenAI API (gpt-5-mini) for branch type classification, title and lineage generation
 - No authentication, no SPA framework, no build step.
 
 ## Setup
 
 ```bash
-git clone https://github.com/<your-org>/groven.git
+git clone https://github.com/sofilab-art/groven.git
 cd groven
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
@@ -60,11 +62,12 @@ Open http://localhost:5000. Seed data loads automatically on first start.
 
 ### Contribution flow
 
-1. Author writes a branch and describes its lineage
-2. LLM proposes a branch type with a two-sentence explanation
-3. Author confirms the type or overrides it
-4. If overridden, the node is flagged as **contested**
-5. The graph updates — contested nodes have a dashed border
+1. Author writes a branch contribution (body text only)
+2. LLM proposes a branch type, generates a title, lineage description, and two-sentence explanation
+3. Author reviews everything in a modal — can edit title and lineage, and confirm or override the type
+4. If the author picks a different type, the LLM rethinks and explains why the author's reading is reasonable
+5. If overridden, the node is flagged as **contested**
+6. The graph updates — contested nodes have a dashed border
 
 ### Visualization
 
