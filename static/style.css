@@ -504,10 +504,10 @@ a:hover {
 }
 
 .llm-explanation {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--text-mid);
     font-style: italic;
-    line-height: 1.5;
+    line-height: 1.45;
 }
 
 .llm-confidence {
@@ -724,8 +724,8 @@ a:hover {
 }
 
 .node-body {
-    font-size: 1rem;
-    line-height: 1.7;
+    font-size: 1.1rem;
+    line-height: 1.75;
     color: var(--dark);
     margin-bottom: 1.5rem;
 }
@@ -736,12 +736,12 @@ a:hover {
     background: rgba(116,198,157,0.08);
     border-left: 3px solid var(--mint);
     border-radius: 0 8px 8px 0;
-    padding: 0.85rem 1rem;
-    margin-bottom: 1.5rem;
+    padding: 0.6rem 0.85rem;
+    margin-bottom: 1rem;
 }
 
 .lineage-label {
-    font-size: 0.78rem;
+    font-size: 0.7rem;
     font-weight: 500;
     color: var(--leaf);
     text-transform: uppercase;
@@ -751,9 +751,9 @@ a:hover {
 }
 
 .lineage-box em {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     color: var(--text-mid);
-    line-height: 1.5;
+    line-height: 1.45;
 }
 
 /* LLM Info Box */
@@ -762,8 +762,8 @@ a:hover {
     background: var(--cream);
     border-left: 3px solid var(--mint);
     border-radius: 0 8px 8px 0;
-    padding: 0.85rem 1rem;
-    margin-bottom: 1.5rem;
+    padding: 0.6rem 0.85rem;
+    margin-bottom: 1rem;
 }
 
 .llm-info-contested {
@@ -772,12 +772,17 @@ a:hover {
 }
 
 .llm-info-header {
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.25rem;
+}
+
+.llm-info-box p {
+    font-size: 0.8rem;
+    line-height: 1.45;
 }
 
 .contested-info {
-    font-size: 0.9rem;
-    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+    margin-bottom: 0.35rem;
     display: flex;
     align-items: center;
     flex-wrap: wrap;

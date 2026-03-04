@@ -42,6 +42,9 @@
         radio.addEventListener('change', updateFormMode);
     });
 
+    // Initialize form to match default checked state (branch)
+    updateFormMode();
+
     // ============================================================
     // LLM Propose Button
     // ============================================================

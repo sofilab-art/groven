@@ -240,7 +240,7 @@
             <div class="node-meta" style="margin-bottom:0.75rem;">
                 <span>by <strong>${node.author}</strong></span>
             </div>
-            <div class="node-body" style="font-size:0.88rem;">${node.body}</div>
+            <div class="node-body" style="font-size:0.95rem;line-height:1.65;">${node.body}</div>
             ${node.lineage_desc ? `
                 <div class="lineage-box" style="margin-top:0.75rem;">
                     <span class="lineage-label">Lineage:</span>
