@@ -1,5 +1,6 @@
 import os
-from flask import Flask, render_template, request, jsonify
+import re
+from flask import Flask, render_template, request, jsonify, redirect
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -55,6 +56,44 @@ def node_view(node_id):
 # ============================================================
 # API Routes
 # ============================================================
+
+@app.route("/api/space", methods=["POST"])
+def api_create_space():
+    """Create a new deliberation space with its first seed."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON body"}), 400
+
+    title = (data.get("title") or "").strip()
+    author = (data.get("author") or "").strip()
+    seed_title = (data.get("seed_title") or "").strip()
+    seed_body = (data.get("seed_body") or "").strip()
+
+    if not title or not author or not seed_title or not seed_body:
+        return jsonify({"error": "Topic, author, seed title, and contribution are required"}), 400
+
+    # Generate slug from title
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60]
+    if not slug:
+        slug = "space"
+
+    # Ensure uniqueness
+    base_slug = slug
+    counter = 2
+    while db.get_space(slug):
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+
+    db.create_space(id=slug, title=title)
+    db.create_node(
+        space_id=slug,
+        author=author,
+        title=seed_title,
+        body=seed_body,
+        node_type="seed"
+    )
+    return jsonify({"id": slug}), 201
+
 
 @app.route("/api/node", methods=["POST"])
 def api_create_node():

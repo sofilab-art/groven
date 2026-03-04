@@ -7,7 +7,7 @@
     <header class="space-header">
         <div>
             <h1>{{ space.title }}</h1>
-            <p class="space-desc">{{ space.description }}</p>
+            {% if space.description %}<p class="space-desc">{{ space.description }}</p>{% endif %}
         </div>
         <span class="status-badge status-{{ space.status }}">{{ space.status }}</span>
     </header>

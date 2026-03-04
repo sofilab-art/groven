@@ -123,6 +123,19 @@ a:hover {
     margin-bottom: 2rem;
 }
 
+.index-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.index-title-row .btn {
+    flex-shrink: 0;
+    white-space: nowrap;
+    width: auto;
+}
+
 .index-header h1 {
     font-size: 2.2rem;
     font-weight: 600;

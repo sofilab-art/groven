@@ -293,3 +293,89 @@
     };
 
 })();
+
+// ============================================================
+// New Space Modal (index page)
+// ============================================================
+
+(function () {
+    const newSpaceBtn = document.getElementById('new-space-btn');
+    if (!newSpaceBtn) return;
+
+    const modal = document.getElementById('new-space-modal');
+    const titleInput = document.getElementById('new-space-title');
+    const authorInput = document.getElementById('new-space-author');
+    const seedTitleInput = document.getElementById('new-space-seed-title');
+    const seedBodyInput = document.getElementById('new-space-seed-body');
+    const createBtn = document.getElementById('new-space-create');
+
+    function openModal() {
+        titleInput.value = '';
+        authorInput.value = '';
+        seedTitleInput.value = '';
+        seedBodyInput.value = '';
+        modal.style.display = 'flex';
+        titleInput.focus();
+    }
+
+    function closeModal() {
+        modal.style.display = 'none';
+    }
+
+    newSpaceBtn.addEventListener('click', openModal);
+    document.getElementById('new-space-cancel').addEventListener('click', closeModal);
+    document.getElementById('new-space-modal-close').addEventListener('click', closeModal);
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.style.display !== 'none') {
+            closeModal();
+        }
+    });
+
+    createBtn.addEventListener('click', async () => {
+        const title = titleInput.value.trim();
+        const author = authorInput.value.trim();
+        const seedTitle = seedTitleInput.value.trim();
+        const seedBody = seedBodyInput.value.trim();
+
+        if (!title || !author || !seedTitle || !seedBody) {
+            alert('All fields are required.');
+            return;
+        }
+
+        createBtn.disabled = true;
+        createBtn.textContent = 'Creating...';
+
+        try {
+            const response = await fetch('/api/space', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: title,
+                    author: author,
+                    seed_title: seedTitle,
+                    seed_body: seedBody
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                window.location.href = '/space/' + data.id;
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+                createBtn.disabled = false;
+                createBtn.textContent = 'Create & Plant Seed';
+            }
+        } catch (err) {
+            console.error('[NewSpace] Error:', err);
+            alert('Network error. Please try again.');
+            createBtn.disabled = false;
+            createBtn.textContent = 'Create & Plant Seed';
+        }
+    });
+})();
