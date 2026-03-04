@@ -6,7 +6,7 @@ Behavioral prototype for Groven — a structured deliberation platform.
 - Python / Flask
 - SQLite (file: groven.db)
 - Vanilla JS + D3.js v7 (CDN)
-- OpenAI API (gpt-4o-mini) for branch type classification
+- OpenAI API (gpt-5-mini) for branch type classification
 - API key in .env as OPENAI_API_KEY
 
 ## Core concept

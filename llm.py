@@ -50,7 +50,7 @@ Classify the Branch type."""
 
 def propose_branch_type(parent_body, branch_body, lineage_desc):
     """
-    Call OpenAI gpt-4o-mini to classify the branch type.
+    Call OpenAI gpt-5-mini to classify the branch type.
     Returns dict: {proposed_type, confidence, explanation}
     Returns None on any error or timeout — never raises, never blocks.
     """
@@ -63,14 +63,13 @@ def propose_branch_type(parent_body, branch_body, lineage_desc):
         )
 
         response = cl.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-mini",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_message}
             ],
-            temperature=0.2,
-            max_tokens=300,
-            timeout=8
+            max_completion_tokens=2048,
+            timeout=15
         )
 
         content = response.choices[0].message.content.strip()
@@ -123,7 +122,7 @@ Write a one-sentence lineage description."""
 
 def generate_lineage(parent_body, branch_body, branch_type):
     """
-    Auto-generate a lineage description using gpt-4o-mini.
+    Auto-generate a lineage description using gpt-5-mini.
     Returns a string, or a fallback sentence on error.
     """
     try:
@@ -135,14 +134,13 @@ def generate_lineage(parent_body, branch_body, branch_type):
         )
 
         response = cl.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-mini",
             messages=[
                 {"role": "system", "content": LINEAGE_SYSTEM_PROMPT},
                 {"role": "user", "content": user_message}
             ],
-            temperature=0.3,
-            max_tokens=120,
-            timeout=8
+            max_completion_tokens=2048,
+            timeout=15
         )
 
         return response.choices[0].message.content.strip()

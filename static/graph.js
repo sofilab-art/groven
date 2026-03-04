@@ -117,18 +117,39 @@
                 .attr('stroke-width', d => d.contested ? 2.5 : 1)
                 .attr('stroke-dasharray', d => d.contested ? '4,3' : 'none');
 
-            // Title labels
-            nodeGroup.append('text')
-                .text(d => {
-                    const label = d.title || d.author;
-                    return label.length > 25 ? label.substring(0, 23) + '...' : label;
-                })
-                .attr('dy', d => (d.node_type === 'seed' ? 30 : 24))
-                .attr('text-anchor', 'middle')
-                .attr('font-size', '10px')
-                .attr('font-family', 'Outfit, sans-serif')
-                .attr('fill', '#374151')
-                .attr('font-weight', d => d.title ? '500' : '400');
+            // Title labels (wrap to 2 lines)
+            nodeGroup.each(function (d) {
+                const label = d.title || d.author;
+                const maxChars = 22;
+                const textEl = d3.select(this).append('text')
+                    .attr('text-anchor', 'middle')
+                    .attr('font-size', '10px')
+                    .attr('font-family', 'Outfit, sans-serif')
+                    .attr('fill', '#374151')
+                    .attr('font-weight', d.title ? '500' : '400');
+
+                const baseY = d.node_type === 'seed' ? 30 : 24;
+
+                if (label.length <= maxChars) {
+                    textEl.append('tspan')
+                        .attr('x', 0).attr('dy', baseY)
+                        .text(label);
+                } else {
+                    // Split at last space within maxChars
+                    let split = label.lastIndexOf(' ', maxChars);
+                    if (split <= 0) split = maxChars;
+                    const line1 = label.substring(0, split);
+                    let line2 = label.substring(split).trimStart();
+                    if (line2.length > maxChars) line2 = line2.substring(0, maxChars - 1) + '\u2026';
+
+                    textEl.append('tspan')
+                        .attr('x', 0).attr('dy', baseY)
+                        .text(line1);
+                    textEl.append('tspan')
+                        .attr('x', 0).attr('dy', '1.2em')
+                        .text(line2);
+                }
+            });
 
             // Hover events
             nodeGroup

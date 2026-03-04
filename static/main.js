@@ -51,6 +51,74 @@
     // Form Submission
     // ============================================================
 
+    const submitBtn = document.getElementById('submit-btn');
+
+    async function saveNode(payload) {
+        try {
+            const response = await fetch('/api/node', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit contribution';
+            }
+        } catch (err) {
+            console.error('[Submit] Error:', err);
+            alert('Network error. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit contribution';
+        }
+    }
+
+    async function showReviewModal(payload) {
+        try {
+            const response = await fetch('/api/node/preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const preview = await response.json();
+
+            if (!response.ok) {
+                alert('Error: ' + (preview.error || 'Unknown error'));
+                return;
+            }
+
+            const modal = document.getElementById('review-modal');
+
+            // Populate modal fields
+            document.getElementById('review-lineage').value = preview.lineage_desc || '';
+            document.getElementById('review-explanation').textContent =
+                preview.explanation || 'LLM unavailable \u2014 please classify manually.';
+            document.getElementById('review-confidence').textContent =
+                preview.confidence != null ? 'Confidence: ' + Math.round(preview.confidence * 100) + '%' : '';
+
+            // Pre-select proposed type
+            const proposedType = preview.proposed_type || '';
+            const radios = modal.querySelectorAll('input[name="review_branch_type"]');
+            radios.forEach(r => { r.checked = (r.value === proposedType); });
+
+            // Store data for confirm handler
+            modal._payload = payload;
+            modal._preview = preview;
+
+            modal.style.display = 'flex';
+
+        } catch (err) {
+            console.error('[Preview] Error:', err);
+            alert('Network error during analysis. Please try again.');
+        }
+    }
+
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -83,35 +151,66 @@
             payload.parent_id = parentId;
         }
 
-        const submitBtn = document.getElementById('submit-btn');
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Saving...';
 
-        try {
-            const response = await fetch('/api/node', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                // Success — reload to see updated graph and node list
-                window.location.reload();
-            } else {
-                alert('Error: ' + (data.error || 'Unknown error'));
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit contribution';
-            }
-
-        } catch (err) {
-            console.error('[Submit] Error:', err);
-            alert('Network error. Please try again.');
+        if (mode === 'seed') {
+            submitBtn.textContent = 'Saving...';
+            await saveNode(payload);
+        } else {
+            submitBtn.textContent = 'Analyzing...';
+            document.getElementById('analyzing-overlay').style.display = 'flex';
+            await showReviewModal(payload);
+            document.getElementById('analyzing-overlay').style.display = 'none';
             submitBtn.disabled = false;
             submitBtn.textContent = 'Submit contribution';
         }
     });
+
+    // ============================================================
+    // Review Modal Handlers
+    // ============================================================
+
+    const reviewModal = document.getElementById('review-modal');
+    if (reviewModal) {
+        function closeModal() {
+            reviewModal.style.display = 'none';
+        }
+
+        document.getElementById('review-cancel').addEventListener('click', closeModal);
+        document.getElementById('review-modal-close').addEventListener('click', closeModal);
+
+        reviewModal.addEventListener('click', (e) => {
+            if (e.target === reviewModal) closeModal();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && reviewModal.style.display !== 'none') {
+                closeModal();
+            }
+        });
+
+        document.getElementById('review-confirm').addEventListener('click', async () => {
+            const payload = reviewModal._payload;
+            const preview = reviewModal._preview;
+
+            const selectedType = reviewModal.querySelector('input[name="review_branch_type"]:checked');
+            if (!selectedType) {
+                alert('Please select a branch type.');
+                return;
+            }
+
+            payload.branch_type = selectedType.value;
+            payload.lineage_desc = document.getElementById('review-lineage').value.trim();
+            payload.llm_proposed_type = preview.proposed_type;
+            payload.llm_explanation = preview.explanation;
+
+            closeModal();
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+
+            await saveNode(payload);
+        });
+    }
 
     // ============================================================
     // Allow clicking graph nodes to pre-fill parent selector

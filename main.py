@@ -89,27 +89,39 @@ def api_create_node():
         if not parent_node:
             return jsonify({"error": "Parent node not found"}), 404
 
-        # Auto-classify branch type via LLM
-        proposal = llm.propose_branch_type(
-            parent_body=parent_node["body"],
-            branch_body=body,
-            lineage_desc=None
-        )
-        if proposal:
-            branch_type = proposal["proposed_type"]
-            llm_proposed_type = proposal["proposed_type"]
-            llm_explanation = proposal.get("explanation")
-        else:
-            # Fallback if LLM is unavailable
-            branch_type = "extension"
-            llm_proposed_type = None
+        # Check if client already provides reviewed LLM data (from review modal)
+        reviewed_branch_type = (data.get("branch_type") or "").strip() or None
+        reviewed_lineage = (data.get("lineage_desc") or "").strip() or None
+        reviewed_llm_proposed = (data.get("llm_proposed_type") or "").strip() or None
+        reviewed_llm_explanation = (data.get("llm_explanation") or "").strip() or None
 
-        # Auto-generate lineage description
-        lineage_desc = llm.generate_lineage(
-            parent_body=parent_node["body"],
-            branch_body=body,
-            branch_type=branch_type
-        )
+        if reviewed_branch_type:
+            # User already reviewed via modal
+            branch_type = reviewed_branch_type
+            llm_proposed_type = reviewed_llm_proposed
+            llm_explanation = reviewed_llm_explanation
+            lineage_desc = reviewed_lineage
+            contested = 1 if (reviewed_llm_proposed and branch_type != llm_proposed_type) else 0
+        else:
+            # Fallback: auto-classify (for direct API calls without modal)
+            proposal = llm.propose_branch_type(
+                parent_body=parent_node["body"],
+                branch_body=body,
+                lineage_desc=None
+            )
+            if proposal:
+                branch_type = proposal["proposed_type"]
+                llm_proposed_type = proposal["proposed_type"]
+                llm_explanation = proposal.get("explanation")
+            else:
+                branch_type = "extension"
+                llm_proposed_type = None
+
+            lineage_desc = llm.generate_lineage(
+                parent_body=parent_node["body"],
+                branch_body=body,
+                branch_type=branch_type
+            )
     else:
         node_type = "seed"
 
@@ -133,6 +145,51 @@ def api_create_node():
         "branch_type": branch_type,
         "contested": contested
     }), 201
+
+
+@app.route("/api/node/preview", methods=["POST"])
+def api_preview_node():
+    """Run LLM analysis on a branch without saving."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON body"}), 400
+
+    body = (data.get("body") or "").strip()
+    parent_id = data.get("parent_id")
+
+    if not parent_id or not body:
+        return jsonify({"error": "parent_id and body are required"}), 400
+
+    parent_node = db.get_node(parent_id)
+    if not parent_node:
+        return jsonify({"error": "Parent node not found"}), 404
+
+    proposal = llm.propose_branch_type(
+        parent_body=parent_node["body"],
+        branch_body=body,
+        lineage_desc=None
+    )
+
+    proposed_type = None
+    confidence = None
+    explanation = None
+    if proposal:
+        proposed_type = proposal["proposed_type"]
+        confidence = proposal.get("confidence")
+        explanation = proposal.get("explanation")
+
+    lineage_desc = llm.generate_lineage(
+        parent_body=parent_node["body"],
+        branch_body=body,
+        branch_type=proposed_type or "extension"
+    )
+
+    return jsonify({
+        "proposed_type": proposed_type,
+        "confidence": confidence,
+        "explanation": explanation,
+        "lineage_desc": lineage_desc
+    })
 
 
 @app.route("/api/llm-propose")
