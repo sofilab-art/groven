@@ -91,39 +91,112 @@
                 body: JSON.stringify(payload)
             });
 
-            const preview = await response.json();
-
             if (!response.ok) {
-                alert('Error: ' + (preview.error || 'Unknown error'));
+                const err = await response.json();
+                alert('Error: ' + (err.error || 'Unknown error'));
                 return;
             }
 
             const modal = document.getElementById('review-modal');
+            const titleInput = document.getElementById('review-title');
+            const lineageInput = document.getElementById('review-lineage');
+            const explanationEl = document.getElementById('review-explanation');
+            const confidenceEl = document.getElementById('review-confidence');
 
-            // Populate modal fields
-            document.getElementById('review-title').value = preview.suggested_title || '';
-            document.getElementById('review-lineage').value = preview.lineage_desc || '';
-            document.getElementById('review-explanation').textContent =
-                preview.explanation || 'LLM unavailable \u2014 please classify manually.';
-            document.getElementById('review-confidence').textContent =
-                preview.confidence != null ? 'Confidence: ' + Math.round(preview.confidence * 100) + '%' : '';
+            // Prepare modal with loading placeholders
+            titleInput.value = '';
+            titleInput.placeholder = 'Generating title...';
+            titleInput.classList.add('field-loading');
+            lineageInput.value = '';
+            lineageInput.placeholder = 'Generating lineage...';
+            lineageInput.classList.add('field-loading');
+            explanationEl.textContent = '';
+            confidenceEl.textContent = '';
 
-            // Pre-select proposed type
-            const proposedType = preview.proposed_type || '';
-            const radios = modal.querySelectorAll('input[name="review_branch_type"]');
-            radios.forEach(r => { r.checked = (r.value === proposedType); });
-
-            // Set question checkbox
+            // Clear type selection and question flag
+            modal.querySelectorAll('input[name="review_branch_type"]').forEach(r => { r.checked = false; });
             const questionCheckbox = document.getElementById('review-is-question');
-            if (questionCheckbox) {
-                questionCheckbox.checked = !!preview.is_question;
-            }
+            if (questionCheckbox) questionCheckbox.checked = false;
 
-            // Store data for confirm handler
+            // Preview object built progressively
+            const preview = {};
             modal._payload = payload;
             modal._preview = preview;
 
-            modal.style.display = 'flex';
+            // Parse SSE stream
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let modalOpened = false;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+
+                // Parse SSE events from buffer
+                while (buffer.includes('\n\n')) {
+                    const idx = buffer.indexOf('\n\n');
+                    const block = buffer.slice(0, idx);
+                    buffer = buffer.slice(idx + 2);
+
+                    let eventType = 'message', data = '';
+                    for (const line of block.split('\n')) {
+                        if (line.startsWith('event: ')) eventType = line.slice(7);
+                        if (line.startsWith('data: ')) data = line.slice(6);
+                    }
+                    if (!data) continue;
+
+                    if (eventType === 'classification') {
+                        const cls = JSON.parse(data);
+                        preview.proposed_type = cls.proposed_type;
+                        preview.is_question = cls.is_question;
+                        preview.confidence = cls.confidence;
+                        preview.explanation = cls.explanation;
+
+                        // Populate classification fields
+                        explanationEl.textContent =
+                            cls.explanation || 'LLM unavailable \u2014 please classify manually.';
+                        confidenceEl.textContent =
+                            cls.confidence != null ? 'Confidence: ' + Math.round(cls.confidence * 100) + '%' : '';
+
+                        const proposedType = cls.proposed_type || '';
+                        modal.querySelectorAll('input[name="review_branch_type"]').forEach(r => {
+                            r.checked = (r.value === proposedType);
+                        });
+
+                        if (questionCheckbox) questionCheckbox.checked = !!cls.is_question;
+
+                        // Open modal immediately — title/lineage will fill in
+                        if (!modalOpened) {
+                            document.getElementById('analyzing-overlay').style.display = 'none';
+                            modal.style.display = 'flex';
+                            modalOpened = true;
+                        }
+                    } else if (eventType === 'title') {
+                        const t = JSON.parse(data);
+                        preview.suggested_title = t.suggested_title;
+                        titleInput.value = t.suggested_title || '';
+                        titleInput.placeholder = 'Title';
+                        titleInput.classList.remove('field-loading');
+                    } else if (eventType === 'lineage') {
+                        const l = JSON.parse(data);
+                        preview.lineage_desc = l.lineage_desc;
+                        lineageInput.value = l.lineage_desc || '';
+                        lineageInput.placeholder = 'Lineage description';
+                        lineageInput.classList.remove('field-loading');
+                    } else if (eventType === 'error') {
+                        const err = JSON.parse(data);
+                        alert(err.error || 'Analysis failed.');
+                    }
+                }
+            }
+
+            // Ensure modal is open even if classification arrived without event loop tick
+            if (!modalOpened) {
+                document.getElementById('analyzing-overlay').style.display = 'none';
+                modal.style.display = 'flex';
+            }
 
         } catch (err) {
             console.error('[Preview] Error:', err);
@@ -176,6 +249,8 @@
             submitBtn.textContent = 'Analyzing...';
             document.getElementById('analyzing-overlay').style.display = 'flex';
             await showReviewModal(payload);
+            // Overlay is hidden by showReviewModal when classification arrives;
+            // ensure it's hidden in case of early return / error too
             document.getElementById('analyzing-overlay').style.display = 'none';
             submitBtn.disabled = false;
             submitBtn.textContent = 'Submit contribution';

@@ -164,6 +164,10 @@ Given a parent contribution and a new branch contribution, write a short descrip
 The title should be concise (max 8 words) and capture the branch's main point or stance.
 People will read this title in a node diagram to understand where the discussion is going.
 
+If the branch is a question (is_question = true), the title MUST be phrased as a question
+ending with a question mark. A question title directly sparks conversation — e.g.
+"How long is each phase?" rather than "Clarify phased approach duration".
+
 Respond ONLY with the title, no quotes, no preamble."""
 
 TITLE_USER_TEMPLATE = """Parent contribution:
@@ -177,13 +181,15 @@ New branch:
 ---
 
 Branch type: {branch_type}
+is_question: {is_question}
 
 Write a short descriptive title."""
 
 
-def generate_title(parent_body, branch_body, branch_type):
+def generate_title(parent_body, branch_body, branch_type, is_question=False):
     """
     Auto-generate a node title using gpt-5-mini.
+    When is_question is True, the title is phrased as a question.
     Returns a string, or a fallback on error.
     """
     try:
@@ -191,7 +197,8 @@ def generate_title(parent_body, branch_body, branch_type):
         user_message = TITLE_USER_TEMPLATE.format(
             parent_body=parent_body,
             branch_body=branch_body,
-            branch_type=branch_type or "unknown"
+            branch_type=branch_type or "unknown",
+            is_question="true" if is_question else "false"
         )
 
         response = cl.chat.completions.create(

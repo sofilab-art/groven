@@ -30,19 +30,24 @@
         .attr('viewBox', [0, 0, width, height])
         .attr('preserveAspectRatio', 'xMidYMin meet');
 
-    // Arrow marker
-    svg.append('defs').append('marker')
-        .attr('id', 'arrowhead')
-        .attr('viewBox', '0 -5 10 10')
-        .attr('refX', 20)
-        .attr('refY', 0)
-        .attr('markerWidth', 6)
-        .attr('markerHeight', 6)
-        .attr('orient', 'auto')
-        .append('path')
-        .attr('d', 'M0,-5L10,0L0,5')
-        .attr('fill', '#2D6A4F')
-        .attr('opacity', 0.5);
+    // Arrow markers
+    // refX 20 → tip at ~12px from center (matches branch radius 12)
+    // refX 33 → tip at ~20px from center (clears synthesis halo at r≈19)
+    const defs = svg.append('defs');
+    [['arrowhead', 20], ['arrowhead-synthesis', 36]].forEach(([id, rx]) => {
+        defs.append('marker')
+            .attr('id', id)
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', rx)
+            .attr('refY', 0)
+            .attr('markerWidth', 6)
+            .attr('markerHeight', 6)
+            .attr('orient', 'auto')
+            .append('path')
+            .attr('d', 'M0,-5L10,0L0,5')
+            .attr('fill', '#2D6A4F')
+            .attr('opacity', 0.5);
+    });
 
     // Tooltip — appended to body so it's never clipped by overflow:hidden
     const tooltip = d3.select('body')
@@ -85,7 +90,7 @@
                 .force('collision', d3.forceCollide().radius(d =>
                     d.node_type === 'seed' ? 28 : 22));
 
-            // Draw links
+            // Draw links — synthesis targets use a marker with larger offset to clear the halo
             const link = g.append('g')
                 .selectAll('line')
                 .data(links)
@@ -93,7 +98,10 @@
                 .attr('stroke', '#2D6A4F')
                 .attr('stroke-opacity', 0.4)
                 .attr('stroke-width', 1.5)
-                .attr('marker-end', 'url(#arrowhead)');
+                .attr('marker-end', d =>
+                    d.target.branch_type === 'synthesis'
+                        ? 'url(#arrowhead-synthesis)'
+                        : 'url(#arrowhead)');
 
             // Draw node groups
             const nodeGroup = g.append('g')
@@ -106,15 +114,78 @@
                     .on('drag', dragged)
                     .on('end', dragended));
 
-            // Proposal halo ring (synthesis nodes)
+            // Proposal halo ring (synthesis nodes) — dashed purple background
             nodeGroup.filter(d => d.branch_type === 'synthesis')
                 .insert('circle', ':first-child')
-                .attr('r', 17)
+                .attr('r', 18)
                 .attr('fill', 'none')
                 .attr('stroke', '#8B5CF6')
-                .attr('stroke-width', 2)
+                .attr('stroke-width', 4)
                 .attr('stroke-opacity', 0.35)
                 .attr('stroke-dasharray', '3,2');
+
+            // Vote arc gauge overlay (synthesis nodes with votes)
+            // Each vote claims a slice; 8 votes = full circle.
+            // Green = support, red = oppose. Remaining ring stays dashed purple.
+            const VOTES_FOR_FULL = 8;
+            const ARC_PER_VOTE = (2 * Math.PI) / VOTES_FOR_FULL;
+            const voteArc = d3.arc().innerRadius(14.5).outerRadius(21.5);
+
+            nodeGroup.filter(d => d.branch_type === 'synthesis' && (d.vote_support || d.vote_oppose))
+                .each(function (d) {
+                    const support = d.vote_support || 0;
+                    const oppose = d.vote_oppose || 0;
+                    const total = support + oppose;
+                    const totalAngle = Math.min(total * ARC_PER_VOTE, 2 * Math.PI);
+                    const supportAngle = total > 0 ? (support / total) * totalAngle : 0;
+                    const opposeAngle = totalAngle - supportAngle;
+
+                    if (support > 0) {
+                        d3.select(this).insert('path', 'circle')
+                            .attr('class', 'vote-arc')
+                            .attr('d', voteArc({ startAngle: 0, endAngle: supportAngle }))
+                            .attr('fill', '#40916C')
+                            .attr('opacity', 0.85);
+                    }
+                    if (oppose > 0) {
+                        d3.select(this).insert('path', 'circle')
+                            .attr('class', 'vote-arc')
+                            .attr('d', voteArc({ startAngle: supportAngle, endAngle: supportAngle + opposeAngle }))
+                            .attr('fill', '#EF4444')
+                            .attr('opacity', 0.85);
+                    }
+                });
+
+            // Expose arc-redraw for live vote updates
+            window._groven_updateArcs = function (nodeData) {
+                nodeGroup.filter(d => d.id === nodeData.id).each(function (d) {
+                    d3.select(this).selectAll('path.vote-arc').remove();
+
+                    const support = d.vote_support || 0;
+                    const oppose = d.vote_oppose || 0;
+                    const total = support + oppose;
+                    if (total === 0) return;
+
+                    const totalAngle = Math.min(total * ARC_PER_VOTE, 2 * Math.PI);
+                    const supportAngle = total > 0 ? (support / total) * totalAngle : 0;
+                    const opposeAngle = totalAngle - supportAngle;
+
+                    if (support > 0) {
+                        d3.select(this).insert('path', 'circle')
+                            .attr('class', 'vote-arc')
+                            .attr('d', voteArc({ startAngle: 0, endAngle: supportAngle }))
+                            .attr('fill', '#40916C')
+                            .attr('opacity', 0.85);
+                    }
+                    if (oppose > 0) {
+                        d3.select(this).insert('path', 'circle')
+                            .attr('class', 'vote-arc')
+                            .attr('d', voteArc({ startAngle: supportAngle, endAngle: supportAngle + opposeAngle }))
+                            .attr('fill', '#EF4444')
+                            .attr('opacity', 0.85);
+                    }
+                });
+            };
 
             // Node circles
             nodeGroup.append('circle')
@@ -381,6 +452,7 @@
                             } else {
                                 node.vote_oppose = (node.vote_oppose || 0) + 1;
                             }
+                            if (window._groven_updateArcs) window._groven_updateArcs(node);
                             showNodeDetail(node);
                         } else {
                             const err = await res.json();

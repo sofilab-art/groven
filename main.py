@@ -1,6 +1,7 @@
 import os
 import re
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template, request, jsonify, redirect, Response
 from dotenv import load_dotenv
 
@@ -198,7 +199,15 @@ def api_create_node():
 
 @app.route("/api/node/preview", methods=["POST"])
 def api_preview_node():
-    """Run LLM analysis on a branch without saving."""
+    """Run LLM analysis on a branch — streamed via SSE.
+
+    Events:
+      classification  — {proposed_type, is_question, confidence, explanation}
+      title           — {suggested_title}
+      lineage         — {lineage_desc}
+      done            — empty (signals all fields are sent)
+      error           — {error}
+    """
     data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON body"}), 400
@@ -213,42 +222,59 @@ def api_preview_node():
     if not parent_node:
         return jsonify({"error": "Parent node not found"}), 404
 
-    proposal = llm.propose_branch_type(
-        parent_body=parent_node["body"],
-        branch_body=body,
-        lineage_desc=None
+    parent_body = parent_node["body"]
+
+    # Werkzeug buffers ~4KB before flushing; pad SSE events to force flush
+    PAD = ":" + " " * 4096 + "\n"
+
+    def generate():
+        # Step 1: Classification (must complete first — title & lineage depend on it)
+        proposal = llm.propose_branch_type(
+            parent_body=parent_body,
+            branch_body=body,
+            lineage_desc=None
+        )
+
+        proposed_type = None
+        confidence = None
+        explanation = None
+        is_question = False
+        if proposal:
+            proposed_type = proposal["proposed_type"]
+            confidence = proposal.get("confidence")
+            explanation = proposal.get("explanation")
+            is_question = proposal.get("is_question", False)
+
+        yield f"event: classification\ndata: {json.dumps({'proposed_type': proposed_type, 'is_question': is_question, 'confidence': confidence, 'explanation': explanation})}\n\n" + PAD
+
+        # Step 2: Lineage + Title in parallel (both depend on classification, independent of each other)
+        branch_type = proposed_type or "extension"
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_lineage = executor.submit(
+                llm.generate_lineage, parent_body, body, branch_type
+            )
+            future_title = executor.submit(
+                llm.generate_title, parent_body, body, branch_type, is_question
+            )
+
+            for future in as_completed([future_lineage, future_title]):
+                try:
+                    result = future.result()
+                    if future is future_title:
+                        yield f"event: title\ndata: {json.dumps({'suggested_title': result})}\n\n" + PAD
+                    else:
+                        yield f"event: lineage\ndata: {json.dumps({'lineage_desc': result})}\n\n" + PAD
+                except Exception as e:
+                    print(f"[Preview] Parallel task error: {e}")
+
+        yield f"event: done\ndata: {json.dumps({})}\n\n"
+
+    return Response(
+        generate(),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
     )
-
-    proposed_type = None
-    confidence = None
-    explanation = None
-    is_question = False
-    if proposal:
-        proposed_type = proposal["proposed_type"]
-        confidence = proposal.get("confidence")
-        explanation = proposal.get("explanation")
-        is_question = proposal.get("is_question", False)
-
-    lineage_desc = llm.generate_lineage(
-        parent_body=parent_node["body"],
-        branch_body=body,
-        branch_type=proposed_type or "extension"
-    )
-
-    suggested_title = llm.generate_title(
-        parent_body=parent_node["body"],
-        branch_body=body,
-        branch_type=proposed_type or "extension"
-    )
-
-    return jsonify({
-        "proposed_type": proposed_type,
-        "is_question": is_question,
-        "confidence": confidence,
-        "explanation": explanation,
-        "lineage_desc": lineage_desc,
-        "suggested_title": suggested_title
-    })
 
 
 @app.route("/api/node/reclassify", methods=["POST"])

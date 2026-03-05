@@ -1142,6 +1142,29 @@ details[open].llm-info-box {
     margin-top: 0;
 }
 
+/* Progressive loading state for title / lineage fields */
+.field-loading {
+    background: repeating-linear-gradient(
+        -45deg,
+        var(--white),
+        var(--white) 8px,
+        rgba(45,106,79,0.04) 8px,
+        rgba(45,106,79,0.04) 16px
+    ) !important;
+    background-size: 22.6px 22.6px !important;
+    animation: field-loading-slide 1.2s linear infinite;
+}
+
+.field-loading::placeholder {
+    color: var(--leaf);
+    font-style: italic;
+}
+
+@keyframes field-loading-slide {
+    0% { background-position: 0 0; }
+    100% { background-position: 22.6px 0; }
+}
+
 .review-modal-footer {
     display: flex;
     gap: 0.75rem;
