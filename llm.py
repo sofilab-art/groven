@@ -324,15 +324,19 @@ SYNTHESIS_SUGGEST_SYSTEM_PROMPT = """You are a synthesis advisor for Groven, a s
 Your task: analyse a complete discussion tree and suggest 1-3 opportunities where
 a synthesis node could connect divergent or complementary threads.
 
-Think step by step before producing your answer:
-1. Map the tree structure — identify which threads diverge or complement each other.
-2. For each pair or cluster of threads, ask: can these be reconciled into a single
-   actionable proposal? If yes, draft the synthesis.
-3. Verify each suggestion references real node IDs and that no existing synthesis
-   already covers the same connection.
-
 A synthesis connects two or more existing lines of thought, reconciling or
 integrating divergent branches into a coherent position.
+
+Your response MUST have two parts, in this exact order:
+
+PART 1 — Analysis (wrapped in <analysis> tags):
+Think step by step. Map the tree structure, identify which threads diverge or
+complement each other. For each pair or cluster of threads, ask: can these be
+reconciled into a single actionable proposal? Write 3-6 sentences of analysis.
+This analysis will be shown to the user in real time.
+
+PART 2 — JSON (after the closing </analysis> tag):
+Output ONLY valid JSON with your suggestions. No markdown fences.
 
 Each suggestion must:
 1. Identify a primary parent node (the node it most directly responds to)
@@ -348,8 +352,10 @@ Only suggest syntheses where genuinely different perspectives can be connected.
 Do NOT suggest syntheses between nodes that already agree.
 Do NOT suggest a synthesis if one already exists that covers the same connection.
 
-Respond ONLY with valid JSON. No preamble, no explanation outside the JSON.
-
+Example response format:
+<analysis>
+The discussion splits into three threads...
+</analysis>
 {
   "suggestions": [
     {
@@ -375,6 +381,61 @@ Existing synthesis nodes (do not re-suggest these connections):
 Suggest 1-3 synthesis opportunities."""
 
 
+def _build_synthesis_prompt(space_title, nodes):
+    """Build the prompt components for synthesis suggestion (shared by sync and streaming)."""
+    node_descriptions = []
+    existing_syntheses = []
+    valid_ids = {n["id"] for n in nodes}
+
+    for n in nodes:
+        body = n["body"][:300] + "..." if len(n["body"]) > 300 else n["body"]
+        node_descriptions.append({
+            "id": n["id"],
+            "parent_id": n["parent_id"],
+            "branch_type": n["branch_type"] or "seed",
+            "author": n["author"],
+            "title": n["title"] or "(untitled)",
+            "body": body
+        })
+        if n["branch_type"] == "synthesis":
+            existing_syntheses.append(
+                f"- {n['title']} (id: {n['id']}, connects to parent {n['parent_id']})"
+            )
+
+    nodes_json = json.dumps(node_descriptions, indent=2)
+    syntheses_text = "\n".join(existing_syntheses) if existing_syntheses else "(none yet)"
+
+    user_message = SYNTHESIS_SUGGEST_USER_TEMPLATE.format(
+        space_title=space_title,
+        nodes_json=nodes_json,
+        existing_syntheses=syntheses_text
+    )
+
+    return user_message, valid_ids
+
+
+def _parse_synthesis_response(content, valid_ids):
+    """Parse and validate the LLM's synthesis JSON response."""
+    content = content.strip()
+    if content.startswith("```"):
+        content = content.split("\n", 1)[1] if "\n" in content else content[3:]
+        if content.endswith("```"):
+            content = content[:-3]
+        content = content.strip()
+
+    result = json.loads(content)
+    suggestions = result.get("suggestions", [])
+
+    validated = []
+    for s in suggestions:
+        if s.get("parent_id") not in valid_ids:
+            continue
+        s["referenced_ids"] = [rid for rid in s.get("referenced_ids", []) if rid in valid_ids]
+        validated.append(s)
+
+    return validated if validated else None
+
+
 def suggest_synthesis(space_title, nodes):
     """
     Analyse all nodes in a space and suggest 1-3 synthesis opportunities.
@@ -383,35 +444,7 @@ def suggest_synthesis(space_title, nodes):
     """
     try:
         cl = _get_client()
-
-        # Build compact node descriptions
-        node_descriptions = []
-        existing_syntheses = []
-        valid_ids = {n["id"] for n in nodes}
-
-        for n in nodes:
-            body = n["body"][:300] + "..." if len(n["body"]) > 300 else n["body"]
-            node_descriptions.append({
-                "id": n["id"],
-                "parent_id": n["parent_id"],
-                "branch_type": n["branch_type"] or "seed",
-                "author": n["author"],
-                "title": n["title"] or "(untitled)",
-                "body": body
-            })
-            if n["branch_type"] == "synthesis":
-                existing_syntheses.append(
-                    f"- {n['title']} (id: {n['id']}, connects to parent {n['parent_id']})"
-                )
-
-        nodes_json = json.dumps(node_descriptions, indent=2)
-        syntheses_text = "\n".join(existing_syntheses) if existing_syntheses else "(none yet)"
-
-        user_message = SYNTHESIS_SUGGEST_USER_TEMPLATE.format(
-            space_title=space_title,
-            nodes_json=nodes_json,
-            existing_syntheses=syntheses_text
-        )
+        user_message, valid_ids = _build_synthesis_prompt(space_title, nodes)
 
         response = cl.chat.completions.create(
             model="gpt-5.2",
@@ -425,25 +458,79 @@ def suggest_synthesis(space_title, nodes):
         )
 
         content = response.choices[0].message.content.strip()
-        if content.startswith("```"):
-            content = content.split("\n", 1)[1] if "\n" in content else content[3:]
-            if content.endswith("```"):
-                content = content[:-3]
-            content = content.strip()
-
-        result = json.loads(content)
-        suggestions = result.get("suggestions", [])
-
-        # Validate node IDs exist
-        validated = []
-        for s in suggestions:
-            if s.get("parent_id") not in valid_ids:
-                continue
-            s["referenced_ids"] = [rid for rid in s.get("referenced_ids", []) if rid in valid_ids]
-            validated.append(s)
-
-        return validated if validated else None
+        # Strip <analysis> section if present
+        if "</analysis>" in content:
+            content = content.split("</analysis>", 1)[1].strip()
+        return _parse_synthesis_response(content, valid_ids)
 
     except Exception as e:
         print(f"[LLM] Synthesis suggestion error: {e}")
         return None
+
+
+def suggest_synthesis_stream(space_title, nodes):
+    """
+    Streaming version of suggest_synthesis().
+    The prompt asks the model to output <analysis>...</analysis> first (streamed to
+    the user in real-time), then JSON suggestions.
+    Yields (event_type, data) tuples:
+      ("reasoning", "token text...")   — analysis text chunks as they arrive
+      ("done", [suggestions])          — validated suggestions list
+      ("error", "message")             — on failure
+    """
+    try:
+        cl = _get_client()
+        user_message, valid_ids = _build_synthesis_prompt(space_title, nodes)
+
+        stream = cl.chat.completions.create(
+            model="gpt-5.2",
+            messages=[
+                {"role": "system", "content": SYNTHESIS_SUGGEST_SYSTEM_PROMPT},
+                {"role": "user", "content": user_message}
+            ],
+            max_completion_tokens=4096,
+            reasoning_effort="low",
+            timeout=60,
+            stream=True
+        )
+
+        full_content = ""
+        analysis_yielded = 0  # how many chars of the analysis we've yielded so far
+
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            if not delta.content:
+                continue
+
+            full_content += delta.content
+
+            # Stream the <analysis> section to the user
+            if "<analysis>" in full_content and "</analysis>" not in full_content:
+                # We're inside the analysis block — yield new text
+                analysis_text = full_content.split("<analysis>", 1)[1]
+                new_text = analysis_text[analysis_yielded:]
+                if new_text:
+                    yield ("reasoning", new_text)
+                    analysis_yielded += len(new_text)
+
+        if not full_content:
+            yield ("error", "No response content from LLM")
+            return
+
+        # Extract JSON after </analysis>
+        if "</analysis>" in full_content:
+            json_part = full_content.split("</analysis>", 1)[1].strip()
+        else:
+            json_part = full_content
+
+        validated = _parse_synthesis_response(json_part, valid_ids)
+        if validated:
+            yield ("done", validated)
+        else:
+            yield ("error", "No valid synthesis suggestions found")
+
+    except Exception as e:
+        print(f"[LLM] Synthesis stream error: {e}")
+        yield ("error", str(e))

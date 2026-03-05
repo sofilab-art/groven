@@ -391,7 +391,9 @@
     const modal = document.getElementById('synthesis-modal');
     const modalBody = document.getElementById('synthesis-modal-body');
     const overlay = document.getElementById('analyzing-overlay');
-    const overlayText = overlay ? overlay.querySelector('p') : null;
+    const overlayText = document.getElementById('analyzing-text');
+    const reasoningEl = document.getElementById('reasoning-stream');
+    const reasoningContent = document.getElementById('reasoning-stream-content');
     const form = document.getElementById('contribution-form');
     const spaceId = form ? form.dataset.spaceId : null;
 
@@ -490,10 +492,11 @@
         btn.disabled = true;
         btn.textContent = 'Thinking...';
 
-        // Show analyzing overlay with custom text
+        // Show analyzing overlay with reasoning stream
         const origText = overlayText ? overlayText.textContent : '';
         if (overlayText) overlayText.textContent = 'Looking for synthesis opportunities...';
         if (overlay) overlay.style.display = 'flex';
+        if (reasoningEl) { reasoningEl.style.display = 'block'; reasoningContent.textContent = ''; }
 
         try {
             const resp = await fetch(`/api/space/${spaceId}/suggest-synthesis`, {
@@ -501,20 +504,60 @@
                 headers: { 'Content-Type': 'application/json' }
             });
 
-            const data = await resp.json();
-
             if (!resp.ok) {
-                alert(data.error || 'Could not generate suggestions.');
+                const err = await resp.json();
+                alert(err.error || 'Could not generate suggestions.');
                 return;
             }
 
-            if (!data.suggestions || data.suggestions.length === 0) {
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let suggestions = null;
+            let hadError = false;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+
+                // Parse SSE events from buffer
+                while (buffer.includes('\n\n')) {
+                    const idx = buffer.indexOf('\n\n');
+                    const block = buffer.slice(0, idx);
+                    buffer = buffer.slice(idx + 2);
+
+                    let eventType = 'message', data = '';
+                    for (const line of block.split('\n')) {
+                        if (line.startsWith('event: ')) eventType = line.slice(7);
+                        if (line.startsWith('data: ')) data = line.slice(6);
+                    }
+                    if (!data) continue;
+
+                    if (eventType === 'reasoning') {
+                        const text = JSON.parse(data);
+                        if (reasoningContent) {
+                            reasoningContent.textContent += text;
+                            reasoningContent.scrollTop = reasoningContent.scrollHeight;
+                        }
+                    } else if (eventType === 'status') {
+                        if (overlayText) overlayText.textContent = JSON.parse(data);
+                    } else if (eventType === 'suggestions') {
+                        suggestions = JSON.parse(data);
+                    } else if (eventType === 'error') {
+                        const err = JSON.parse(data);
+                        alert(err.error || 'Could not generate suggestions.');
+                        hadError = true;
+                    }
+                }
+            }
+
+            if (!hadError && suggestions && suggestions.suggestions && suggestions.suggestions.length > 0) {
+                renderSuggestions(suggestions.suggestions);
+                modal.style.display = 'flex';
+            } else if (!hadError) {
                 alert('No synthesis opportunities found at this time.');
-                return;
             }
-
-            renderSuggestions(data.suggestions);
-            modal.style.display = 'flex';
 
         } catch (err) {
             console.error('[Synthesis] Error:', err);
@@ -524,6 +567,7 @@
             btn.textContent = 'Suggest synthesis';
             if (overlay) overlay.style.display = 'none';
             if (overlayText) overlayText.textContent = origText;
+            if (reasoningEl) reasoningEl.style.display = 'none';
         }
     });
 })();

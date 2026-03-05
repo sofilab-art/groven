@@ -1,6 +1,7 @@
 import os
 import re
-from flask import Flask, render_template, request, jsonify, redirect
+import json
+from flask import Flask, render_template, request, jsonify, redirect, Response
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -323,29 +324,13 @@ def api_tree(space_id):
     return jsonify(nodes)
 
 
-@app.route("/api/space/<space_id>/suggest-synthesis", methods=["POST"])
-def api_suggest_synthesis(space_id):
-    """Ask the LLM to suggest synthesis opportunities for a space."""
-    space = db.get_space(space_id)
-    if not space:
-        return jsonify({"error": "Space not found"}), 404
-
-    nodes = db.get_tree(space_id)
-    if len(nodes) < 3:
-        return jsonify({"error": "Need at least 3 contributions before suggesting syntheses"}), 400
-
-    suggestions = llm.suggest_synthesis(space["title"], nodes)
-    if suggestions is None:
-        return jsonify({"error": "LLM unavailable. Please try again."}), 503
-
-    # Enrich suggestions with node titles for display
-    node_map = {n["id"]: n for n in nodes}
+def _enrich_suggestions(suggestions, node_map):
+    """Enrich raw suggestions with node titles, authors, and proposal summaries."""
     enriched = []
     for s in suggestions:
         parent = node_map.get(s["parent_id"])
         refs = [node_map.get(rid) for rid in s.get("referenced_ids", []) if node_map.get(rid)]
 
-        # Generate a one-sentence proposal summary
         summary = llm.generate_proposal_summary(s["body"])
 
         enriched.append({
@@ -362,8 +347,50 @@ def api_suggest_synthesis(space_id):
             "reasoning": s["reasoning"],
             "proposal_summary": summary
         })
+    return enriched
 
-    return jsonify({"suggestions": enriched})
+
+@app.route("/api/space/<space_id>/suggest-synthesis", methods=["POST"])
+def api_suggest_synthesis(space_id):
+    """Ask the LLM to suggest synthesis opportunities for a space (SSE stream)."""
+    space = db.get_space(space_id)
+    if not space:
+        return jsonify({"error": "Space not found"}), 404
+
+    nodes = db.get_tree(space_id)
+    if len(nodes) < 3:
+        return jsonify({"error": "Need at least 3 contributions before suggesting syntheses"}), 400
+
+    node_map = {n["id"]: n for n in nodes}
+
+    # Werkzeug buffers ~4KB before flushing; pad SSE events to force flush
+    PAD = ":" + " " * 4096 + "\n"
+
+    def generate():
+        suggestions = None
+        for event_type, data in llm.suggest_synthesis_stream(space["title"], nodes):
+            if event_type == "reasoning":
+                yield f"event: reasoning\ndata: {json.dumps(data)}\n\n" + PAD
+            elif event_type == "done":
+                suggestions = data
+            elif event_type == "error":
+                yield f"event: error\ndata: {json.dumps({'error': data})}\n\n" + PAD
+                return
+
+        if not suggestions:
+            yield f"event: error\ndata: {json.dumps({'error': 'No suggestions generated'})}\n\n" + PAD
+            return
+
+        yield f"event: status\ndata: {json.dumps('Generating proposal summaries...')}\n\n" + PAD
+
+        enriched = _enrich_suggestions(suggestions, node_map)
+        yield f"event: suggestions\ndata: {json.dumps({'suggestions': enriched})}\n\n"
+
+    return Response(
+        generate(),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    )
 
 
 @app.route("/api/vote", methods=["POST"])
