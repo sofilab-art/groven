@@ -69,6 +69,7 @@ S4_B7      = "s4-branch7-felix"
 S4_B8      = "s4-branch8-priya"
 S4_B9      = "s4-branch9-leo"
 S4_B10     = "s4-branch10-sofia"
+S4_SYNTH   = "s4-synthesis-groven"
 
 NODES = [
     # =========================================================================
@@ -478,6 +479,20 @@ NODES = [
         "llm_explanation": "The Branch takes the parent\u2019s idea of starting with a chamber Lachenmann piece and formalizes it into a two-season plan with Phase 1 being the chamber work plus education and Phase 2 contingent on positive reception. That builds on and supports the parent\u2019s proposal without contradicting it, adding a forward plan and decision point, so it is an extension.",
         "contested": 0
     },
+    {
+        "id": S4_SYNTH,
+        "space_id": "ensemble-lachenmann",
+        "parent_id": S4_SEED,
+        "node_type": "branch",
+        "branch_type": "synthesis",
+        "author": "Groven AI",
+        "title": "Phase-in Lachenmann via chamber pilot",
+        "body": "Adopt a two-season rollout: program a short chamber Lachenmann work (1\u20133 players) next season as a pilot, with rehearsal happening independently from the main program, and commit to a full-ensemble Lachenmann work only if player readiness and audience response meet agreed thresholds. Define those thresholds in advance (e.g., minimum extra rehearsal hours required, player survey results, and post-concert audience feedback). This keeps the artistic commitment while preventing rehearsal overload risk.",
+        "lineage_desc": "Connects the chamber-piece stepping stone (Yuna), the two-season plan with data-driven decision point (Sofia), the audience development framing (Tom\u00e1s), and the rehearsal concern (Reiko) into a single phased rollout with predefined success thresholds.",
+        "llm_proposed_type": "synthesis",
+        "llm_explanation": "This branch integrates multiple earlier threads \u2014 the chamber piece as stepping stone, the two-season plan, audience development, and rehearsal constraints \u2014 into a unified proposal with clear decision criteria. It reconciles the tension between artistic ambition and practical feasibility.",
+        "contested": 0
+    },
 ]
 
 
@@ -520,6 +535,50 @@ VOTES = [
         "author": "Amara",
         "position": "oppose",
         "justification": "Letting the first jury define succession rules concentrates too much power in an initial random draw."
+    },
+
+    # Votes on S4_SYNTH — "Phase-in Lachenmann via chamber pilot"
+    {
+        "node_id": S4_SYNTH,
+        "author": "Clara",
+        "position": "support",
+        "justification": "A phased approach is the responsible way to realize the artistic vision without risking our season."
+    },
+    {
+        "node_id": S4_SYNTH,
+        "author": "Sofia",
+        "position": "support",
+        "justification": "Predefined thresholds give the board a clear decision framework — exactly what they need."
+    },
+    {
+        "node_id": S4_SYNTH,
+        "author": "Felix",
+        "position": "support",
+        "justification": "Starting with chamber works is the ideal way to build confidence across the ensemble."
+    },
+    {
+        "node_id": S4_SYNTH,
+        "author": "Yuna",
+        "position": "support",
+        "justification": "This is precisely the stepping-stone approach I proposed — glad to see it formalized."
+    },
+    {
+        "node_id": S4_SYNTH,
+        "author": "Reiko",
+        "position": "oppose",
+        "justification": "Even a chamber pilot diverts rehearsal time from our core repertoire obligations."
+    },
+    {
+        "node_id": S4_SYNTH,
+        "author": "Aisha",
+        "position": "oppose",
+        "justification": "Why Lachenmann at all? The pilot normalizes a composer choice that should be questioned first."
+    },
+    {
+        "node_id": S4_SYNTH,
+        "author": "Tomás",
+        "position": "support",
+        "justification": "The audience development dimension is built into the thresholds — this takes my concern seriously."
     },
 ]
 
