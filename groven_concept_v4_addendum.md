@@ -38,6 +38,7 @@ This two-model architecture may be worth formalising in the concept paper's tech
 - Every synthesis node is automatically a proposal. The LLM generates a one-sentence *proposal summary* — a distillation of the synthesis body into a concrete, votable statement.
 - Participants can Support or Oppose the proposal with a one-sentence justification.
 - Vote tallies and individual positions are visible on the node, both in the graph panel and on the node detail page.
+- In the graph, synthesis nodes display a **vote arc gauge** — a ring that fills proportionally as votes arrive. Green arcs represent support, red arcs represent opposition, and the unfilled portion remains as a dashed purple halo. Eight votes fill the full circle. This communicates two signals simultaneously: the balance of opinion *and* whether enough people have voted to form a representative picture. The gauge updates live after inline votes without page reload.
 
 **Why this matters for the concept paper:**
 The concept paper's governance module (Section 3) envisions voting as a formal, space-level event: a jury declares readiness, the LLM summarises, the space closes, votes are cast. This is correct for constitutional decisions.
@@ -57,12 +58,15 @@ The concept paper should consider whether to formalise this distinction.
 **Partially covered.** Section 2.2 describes the Branch creation requirement (lineage description) and Section 2.5 describes the LLM's role. The prototype reveals the full UX flow, which has implications worth documenting:
 
 1. Author writes only the body text (no title, no type selection, no lineage).
-2. The LLM reads parent + body and returns: proposed type, whether it's a question, generated title, lineage description, and a two-sentence explanation.
-3. The author reviews everything in a modal. They can edit the title and lineage description, confirm or override the type, and toggle the "This is a question" checkbox.
-4. If the author picks a different type, the LLM is called again to *rethink* — it generates a new explanation acknowledging why the author's reading is reasonable, and reconsiders whether the contribution is a question.
-5. If overridden, the node is flagged as Contested. Question nodes display a `?` marker in the graph and on type badges.
+2. The analysis streams progressively via Server-Sent Events (SSE). Classification arrives first; the review modal opens immediately. Title and lineage generate in parallel (via `ThreadPoolExecutor`) and fill in as they arrive, with animated loading stripes indicating progress. This reduces perceived wait time significantly — the author can already review the type proposal while title and lineage are still generating.
+3. The LLM reads parent + body and returns: proposed type, whether it's a question, generated title, lineage description, and a two-sentence explanation. When the contribution is a question, the title is phrased as a question ending with `?` (e.g. "How long is each phase?" rather than "Clarify phased approach duration") — this makes question nodes immediately recognisable in the graph.
+4. The author reviews everything in a modal. They can edit the title and lineage description, confirm or override the type, and toggle the "This is a question" checkbox.
+5. If the author picks a different type, the LLM is called again to *rethink* — it generates a new explanation acknowledging why the author's reading is reasonable, and reconsiders whether the contribution is a question.
+6. If overridden, the node is flagged as Contested. Question nodes display a `?` marker in the graph and on type badges.
 
 **Key observation:** The author writes *less* than the concept paper assumes (no title, no lineage, no type, no speech-act classification), and the LLM proposes *more* (title, lineage, type, question flag, explanation). This inverts the expected burden: the LLM does the structuring work, the author does the editorial work. Whether this produces better or worse lineage descriptions than author-written ones is an open empirical question.
+
+**Progressive streaming is significant.** The SSE architecture means the author never faces a blank loading screen for the full duration of all three LLM calls. The modal opens as soon as classification is ready (~1–2 seconds), and title/lineage fill in over the next few seconds. This matters because the classification is what the author needs to engage with first — title and lineage are secondary fields they may only glance at. The streaming order matches the cognitive priority.
 
 **The rethinking step (4) is significant.** When the author overrides, the LLM doesn't simply accept the correction — it explains why the author's classification is reasonable. This creates a record of interpretive ambiguity that is more informative than a silent override. It is also a test of LLM epistemic humility: can it genuinely argue for a classification it didn't initially propose?
 
@@ -93,7 +97,7 @@ The modifier approach has a further advantage: it does not increase the cognitiv
 
 The prototype ships with four pre-loaded discussion spaces. The fourth — *Should our ensemble perform Helmut Lachenmann?* — was constructed as a controlled test of the full branch typology and synthesis flow.
 
-**Structure:** 1 seed + 10 branches from 10 musicians (Clara, Marcus, Reiko, Tomas, Yuna, Dmitri, Aisha, Felix, Priya, Leo, Sofia). The tree covers all five branch types across three levels of depth. No synthesis node is pre-loaded — users are expected to generate one via the synthesis suggestion feature.
+**Structure:** 1 seed + 10 branches + 1 synthesis from 10 musicians (Clara, Marcus, Reiko, Tomás, Yuna, Dmitri, Aisha, Felix, Priya, Leo, Sofia). The tree covers all five branch types across three levels of depth. A pre-loaded synthesis node — *Phase-in Lachenmann via chamber pilot* — demonstrates the vote arc gauge with 7 example votes (5 support, 2 oppose), showing how the visual indicator communicates both vote balance and participation level at a glance.
 
 **Why this matters:** The first three spaces are in the CORPUS context (music rights governance). The Lachenmann space demonstrates that the deliberation structure is genuinely domain-agnostic — it works equally well for an artistic programming decision as for a licensing governance question. This validates the concept paper's claim in Section 1.3 that Groven is "domain-agnostic and open source."
 
@@ -123,7 +127,7 @@ The prototype does not display confidence scores. The LLM explanation serves as 
 | React frontend | Vanilla JS | No build step, no framework overhead for a behavioral prototype |
 | Claude API (claude-sonnet-4-6) | OpenAI gpt-5-mini + gpt-5.2 | Two-model architecture emerged as better fit (see Section 1 above) |
 | OAuth2 / OIDC auth | No authentication | Not needed for behavioral testing |
-| REST + WebSocket | REST only | Real-time updates not yet needed |
+| REST + WebSocket | REST + SSE streaming | Branch preview streams classification, title, and lineage progressively via Server-Sent Events |
 | Cryptographic signing of decision nodes | Not implemented | Governance voting not yet at production stage |
 
 These deviations are intentional and appropriate for a behavioral prototype. The concept paper's recommendations remain valid for the production implementation.
