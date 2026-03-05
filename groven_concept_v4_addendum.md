@@ -120,7 +120,37 @@ The prototype does not display confidence scores. The LLM explanation serves as 
 
 ---
 
-### 7. Deviations from the Concept Paper's Technical Recommendations
+### 7. Governance Cycle Implementation (Open → Ready → Decided)
+
+**Partially covered.** Section 3.1 of the concept paper describes a three-state governance cycle: Open → Ready → Decided. The prototype now implements this concretely, with some deviations from the paper's vision that are worth documenting.
+
+**How it works:**
+
+**Open → Ready:** Any participant can click "Declare Ready" in the space header. A confirmation modal explains the consequences (discussion locks, no new contributions or synthesis suggestions, voting on existing proposals remains active). After confirmation, the space status changes immediately and the LLM (gpt-5.2 with `reasoning_effort="low"`) generates a structured discussion summary that streams progressively via SSE. The summary has three mandatory sections: **Positions** (distinct positions with key contributors), **Syntheses** (synthesis proposals attempted and their vote state), and **Open Forks** (unresolved contradictions or questions). The summary is stored on the space and displayed in place of the contribution form.
+
+**Ready → Decided:** A participant clicks "Record Decision." A modal presents all synthesis proposals **ranked by net vote balance** (support minus oppose, descending) as selectable cards. The leading proposal is pre-selected and marked with a **Leading** badge. If the participant selects a different proposal, an amber warning appears ("You are selecting a proposal that is not the leading choice") and the justification prompt changes to require an explanation for overriding the majority preference. This creates **social friction without a hard block** — votes are advisory, not binding, but deviating from the popular choice demands visible accountability. The participant enters their name and a written justification and submits. The backend creates a **Decision node** as a child of the winning synthesis, with `node_type='decision'`. The node's `decision_meta` JSON field snapshots all votes — support count, oppose count, individual positions with justifications, and minority positions (oppose votes) highlighted separately. This snapshot provides a permanent record even if the votes table changes later. The space status moves to `decided` and is permanently archived.
+
+**Decision node in the graph:** Decision nodes are visually distinct from all other node types. They use a dark green fill (`#1B4332`), a larger radius (20px, between seeds at 18px and to stand out from branches at 12px), a white checkmark **✓** overlay (following the pattern of the **?** on question nodes), and a solid gold halo ring (`#D4A373`, not dashed like the synthesis halo). The gold ring signals finality rather than ongoing deliberation.
+
+**Decision banner:** On decided spaces, a banner above the discussion summary shows the decision title, justification, vote breakdown, minority positions, and the name and timestamp of who recorded the decision. A link navigates to the full Decision node detail page, which lists all individual votes.
+
+**Deviations from the concept paper:**
+
+1. **No formal jury mechanism.** The concept paper envisions a specific governance jury that declares readiness and votes. The prototype allows *any* participant to declare ready and record a decision. This is appropriate for behavioral testing — the question of who has authority to make these transitions is a governance design question, not a prototype question.
+
+2. **Decision is on synthesis nodes only.** The concept paper leaves open what a "decision" resolves. The prototype constrains it: a decision can only be recorded on a synthesis proposal. This forces the group to synthesise before deciding, which aligns with the concept paper's emphasis on synthesis as the highest-order branch type.
+
+3. **Discussion summary is LLM-generated, not author-written.** The concept paper (Section 3.1) describes the LLM summarising the discussion. The prototype implements this literally — the summary is generated on demand during the transition, not curated by a human. The three-section structure (Positions / Syntheses / Open Forks) ensures the summary serves governance rather than just narrative purposes.
+
+4. **Votes are advisory with friction, not binding.** The concept paper leaves open the relationship between votes and decisions. The prototype implements a middle path: votes rank proposals and set the default, but the decision-maker can override the popular choice if they justify it. This avoids both pure majority rule (which can silence minority positions worth considering) and pure discretion (which can ignore collective input). The UX creates friction — a visible warning and a changed justification prompt — without a mechanical block. Whether this balance is correct is an empirical question for user testing.
+
+5. **No quorum.** The prototype does not enforce a minimum number of votes before a decision can be recorded. This is deliberate for a behavioral prototype — quorum rules are policy decisions that should not be hardcoded until user testing reveals what thresholds feel appropriate.
+
+**Seed data now demonstrates all three states:** `corpus-ai-training` is decided (with a Decision node, vote snapshot, and discussion summary), `corpus-jury-composition` is ready (with a discussion summary, awaiting a decision), and the other two spaces remain open.
+
+---
+
+### 8. Deviations from the Concept Paper's Technical Recommendations
 
 | Concept Paper | Prototype | Reason |
 |---|---|---|
@@ -130,6 +160,6 @@ The prototype does not display confidence scores. The LLM explanation serves as 
 | Claude API (claude-sonnet-4-6) | OpenAI gpt-5-mini + gpt-5.2 | Two-model architecture emerged as better fit (see Section 1 above) |
 | OAuth2 / OIDC auth | No authentication | Not needed for behavioral testing |
 | REST + WebSocket | REST + SSE streaming | Branch preview streams classification, title, and lineage progressively via Server-Sent Events |
-| Cryptographic signing of decision nodes | Not implemented | Governance voting not yet at production stage |
+| Cryptographic signing of decision nodes | JSON vote snapshot in `decision_meta` | Vote permanence via snapshot; cryptographic signing deferred to production |
 
 These deviations are intentional and appropriate for a behavioral prototype. The concept paper's recommendations remain valid for the production implementation.

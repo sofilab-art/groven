@@ -555,3 +555,103 @@ def suggest_synthesis_stream(space_title, nodes):
     except Exception as e:
         print(f"[LLM] Synthesis stream error: {e}")
         yield ("error", str(e))
+
+
+# ── Discussion summary (governance: Open → Ready) ─────────────────────
+
+DISCUSSION_SUMMARY_SYSTEM_PROMPT = """You are a discussion summariser for Groven, a structured deliberation platform.
+
+Your task: produce a structured summary of a complete discussion tree for a governance body preparing to make a decision.
+
+The summary MUST contain exactly three sections:
+
+1. **Positions** — List the distinct positions that emerged in the discussion. For each position, name the key contributors and briefly state the position (1–2 sentences).
+
+2. **Syntheses** — List any synthesis proposals that were attempted. For each, state what it connects, whether it has vote support, and what the current vote balance is.
+
+3. **Open Forks** — List unresolved contradictions or questions that the discussion did not resolve. These are threads where genuine disagreement remains and no synthesis has been accepted.
+
+Write in clear, neutral language. Do not recommend a decision. Do not take a position.
+The summary should be 200–400 words.
+
+Format the output as structured markdown with the three headers: ## Positions, ## Syntheses, ## Open Forks"""
+
+
+DISCUSSION_SUMMARY_USER_TEMPLATE = """Discussion space: {space_title}
+
+Here is the complete discussion tree. Each node has an id, parent_id (null for seeds), branch_type, author, title, body, and is_question flag.
+
+{nodes_json}
+
+Vote tallies for synthesis nodes:
+{vote_tallies_text}
+
+Produce a structured summary for the governance body."""
+
+
+def generate_discussion_summary_stream(space_title, nodes, vote_tallies):
+    """
+    Stream a structured discussion summary for the governance body.
+    Yields (event_type, data) tuples:
+      ("chunk", "text...")        — streamed summary text as it arrives
+      ("done", "full markdown")   — complete summary
+      ("error", "message")        — on failure
+    """
+    try:
+        cl = _get_client()
+
+        # Build nodes JSON (same truncation as synthesis prompt)
+        nodes_for_prompt = []
+        for n in nodes:
+            nodes_for_prompt.append({
+                "id": n["id"],
+                "parent_id": n.get("parent_id"),
+                "node_type": n.get("node_type", "branch"),
+                "branch_type": n.get("branch_type"),
+                "author": n.get("author", ""),
+                "title": n.get("title", ""),
+                "body": (n.get("body") or "")[:300],
+                "is_question": bool(n.get("is_question"))
+            })
+
+        tallies_text = "No votes yet." if not vote_tallies else "\n".join(
+            f"- Node {nid}: {t['support']} support, {t['oppose']} oppose"
+            for nid, t in vote_tallies.items()
+        )
+
+        user_message = DISCUSSION_SUMMARY_USER_TEMPLATE.format(
+            space_title=space_title,
+            nodes_json=json.dumps(nodes_for_prompt, indent=2),
+            vote_tallies_text=tallies_text
+        )
+
+        stream = cl.chat.completions.create(
+            model="gpt-5.2",
+            messages=[
+                {"role": "system", "content": DISCUSSION_SUMMARY_SYSTEM_PROMPT},
+                {"role": "user", "content": user_message}
+            ],
+            max_completion_tokens=2048,
+            reasoning_effort="low",
+            timeout=60,
+            stream=True
+        )
+
+        full_content = ""
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            if not delta.content:
+                continue
+            full_content += delta.content
+            yield ("chunk", delta.content)
+
+        if full_content:
+            yield ("done", full_content)
+        else:
+            yield ("error", "No response content from LLM")
+
+    except Exception as e:
+        print(f"[LLM] Discussion summary stream error: {e}")
+        yield ("error", str(e))

@@ -10,7 +10,12 @@
             {% if space.description %}<p class="space-desc">{{ space.description }}</p>{% endif %}
         </div>
         <div class="space-header-actions">
+            {% if space.status == 'open' %}
             <button id="suggest-synthesis-btn" class="btn btn-synthesis">Suggest synthesis</button>
+            <button id="declare-ready-btn" class="btn btn-ready">Declare Ready</button>
+            {% elif space.status == 'ready' %}
+            <button id="record-decision-btn" class="btn btn-decision">Record Decision</button>
+            {% endif %}
             <span class="status-badge status-{{ space.status }}">{{ space.status }}</span>
         </div>
     </header>
@@ -29,7 +34,45 @@
                 <div id="node-detail-content"></div>
             </div>
 
-            <!-- Contribution Form -->
+            {% if space.status == 'decided' %}
+            <!-- Decision Banner -->
+            {% set ns = namespace(decision_node=None) %}
+            {% for n in nodes if n.node_type == 'decision' %}
+            {% set ns.decision_node = n %}
+            {% endfor %}
+            {% if ns.decision_node %}
+            {% set decision_node = ns.decision_node %}
+            <div class="decision-banner">
+                <div class="decision-banner-icon">✓</div>
+                <h3 class="decision-banner-title">{{ decision_node.title }}</h3>
+                <p class="decision-banner-body">{{ decision_node.body }}</p>
+                {% if decision_node.decision_meta %}
+                {% set meta = decision_node.decision_meta | tojson | safe %}
+                <div class="decision-banner-votes" id="decision-banner-votes"
+                     data-meta="{{ decision_node.decision_meta | e }}">
+                </div>
+                {% endif %}
+                <div class="decision-banner-meta">
+                    Recorded by <strong>{{ decision_node.author }}</strong>
+                    {% if space.decided_at %} · {{ space.decided_at }}{% endif %}
+                </div>
+                <a href="/node/{{ decision_node.id }}" class="btn btn-secondary" style="margin-top:0.75rem;display:block;text-align:center;">
+                    View full decision &rarr;
+                </a>
+            </div>
+            {% endif %}
+            {% endif %}
+
+            {% if space.status in ['ready', 'decided'] and space.discussion_summary %}
+            <!-- Discussion Summary -->
+            <div class="discussion-summary-panel">
+                <h3>Discussion Summary</h3>
+                <div class="discussion-summary-content" id="discussion-summary-content">{{ space.discussion_summary }}</div>
+            </div>
+            {% endif %}
+
+            {% if space.status == 'open' %}
+            <!-- Contribution Form (only when open) -->
             <div id="contribution-form-wrapper">
                 <h3>Add contribution</h3>
                 <form id="contribution-form" data-space-id="{{ space.id }}">
@@ -81,16 +124,19 @@
                     <button type="submit" id="submit-btn" class="btn btn-primary">Submit contribution</button>
                 </form>
             </div>
+            {% endif %}
 
             <!-- Node List -->
             <div class="node-list">
                 <h3>All contributions</h3>
                 <div id="node-list-items">
                     {% for node in nodes %}
-                    <a href="/node/{{ node.id }}" class="node-list-item {% if node.contested %}contested{% endif %}">
+                    <a href="/node/{{ node.id }}" class="node-list-item {% if node.contested %}contested{% endif %} {% if node.node_type == 'decision' %}decision-item{% endif %}">
                         <div class="node-list-header">
                             <span class="node-author">{{ node.author }}</span>
-                            {% if node.branch_type %}
+                            {% if node.node_type == 'decision' %}
+                            <span class="type-badge type-decision">decision</span>
+                            {% elif node.branch_type %}
                             <span class="type-badge type-{{ node.branch_type }}">{{ node.branch_type }}{% if node.is_question %}?{% endif %}</span>
                             {% else %}
                             <span class="type-badge type-seed">Seed</span>
@@ -115,6 +161,9 @@
         </div>
         <div id="reasoning-stream" class="reasoning-stream" style="display:none;">
             <div id="reasoning-stream-content" class="reasoning-stream-content"></div>
+        </div>
+        <div id="summary-stream" class="summary-stream" style="display:none;">
+            <div id="summary-stream-content" class="summary-stream-content"></div>
         </div>
     </div>
 </div>
@@ -203,9 +252,80 @@
         </div>
     </div>
 </div>
+<!-- Ready Confirmation Modal -->
+<div id="ready-modal" class="review-modal-overlay" style="display:none;">
+    <div class="review-modal">
+        <div class="review-modal-header">
+            <h3>Declare Ready for Decision</h3>
+            <button type="button" id="ready-modal-close" class="close-btn">&times;</button>
+        </div>
+        <div class="review-modal-body">
+            <div class="ready-modal-warning">
+                <p><strong>This will close the discussion.</strong></p>
+                <p>No new contributions or synthesis suggestions will be accepted. Voting on existing synthesis proposals will remain active during the decision phase.</p>
+                <p>The LLM will generate a structured summary of the discussion so far.</p>
+            </div>
+            <div class="form-group">
+                <label for="ready-author">Your name</label>
+                <input type="text" id="ready-author" placeholder="Who is declaring ready?">
+            </div>
+        </div>
+        <div class="review-modal-footer">
+            <button type="button" id="ready-cancel" class="btn btn-secondary">Cancel</button>
+            <button type="button" id="ready-confirm" class="btn btn-ready">Declare Ready</button>
+        </div>
+    </div>
+</div>
+<!-- Decision Recording Modal -->
+<div id="decision-modal" class="review-modal-overlay" style="display:none;">
+    <div class="review-modal decision-modal">
+        <div class="review-modal-header">
+            <h3>Record Decision</h3>
+            <button type="button" id="decision-modal-close" class="close-btn">&times;</button>
+        </div>
+        <div class="review-modal-body">
+            <p class="decision-modal-intro">The proposals below are ranked by vote balance. Select the winning proposal and provide a justification.</p>
+            <div class="proposal-select-list" id="proposal-select-list">
+                {% for syn in synthesis_nodes %}
+                <label class="proposal-select-card" data-net-support="{{ (syn.vote_support or 0) - (syn.vote_oppose or 0) }}">
+                    <input type="radio" name="selected_proposal" value="{{ syn.id }}"{% if loop.first %} checked{% endif %} data-is-leader="{{ 'true' if loop.first else 'false' }}">
+                    <div class="proposal-select-card-inner">
+                        <div class="proposal-select-card-header">
+                            <span class="proposal-select-card-title">{{ syn.title or syn.body[:60] }}</span>
+                            <span class="proposal-select-card-votes">
+                                {% if loop.first %}<span class="leader-badge">Leading</span>{% endif %}
+                                <span class="vote-support-count">{{ syn.vote_support or 0 }} ✓</span>
+                                <span class="vote-oppose-count">{{ syn.vote_oppose or 0 }} ✗</span>
+                            </span>
+                        </div>
+                        <p class="proposal-select-card-summary">{{ syn.proposal_summary or syn.body[:150] }}</p>
+                        <span class="proposal-select-card-author">by {{ syn.author }}</span>
+                    </div>
+                </label>
+                {% endfor %}
+            </div>
+            <div id="minority-warning" class="minority-warning" style="display:none;">
+                <strong>Note:</strong> You are selecting a proposal that is not the leading choice. Please explain why in your justification.
+            </div>
+            <div class="form-group">
+                <label for="decision-author">Your name</label>
+                <input type="text" id="decision-author" placeholder="Who is recording this decision?">
+            </div>
+            <div class="form-group">
+                <label for="decision-justification">Justification</label>
+                <span class="label-hint" id="decision-justification-hint">Why was this proposal chosen? Note any key factors.</span>
+                <textarea id="decision-justification" rows="3" placeholder="Explain the reasoning behind this decision..."></textarea>
+            </div>
+        </div>
+        <div class="review-modal-footer">
+            <button type="button" id="decision-cancel" class="btn btn-secondary">Cancel</button>
+            <button type="button" id="decision-confirm" class="btn btn-decision">Record Decision</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-<script src="{{ url_for('static', filename='graph.js') }}?v=6"></script>
+<script src="{{ url_for('static', filename='graph.js') }}?v=7"></script>
 {% endblock %}

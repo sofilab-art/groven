@@ -1518,6 +1518,438 @@ details[open].llm-info-box {
 }
 
 /* ============================================================
+   Governance — Declare Ready Button
+   ============================================================ */
+
+.btn-ready {
+    background: var(--sand);
+    color: var(--dark);
+    width: auto;
+    white-space: nowrap;
+}
+
+.btn-ready:hover {
+    background: #c49363;
+}
+
+/* ============================================================
+   Governance — Record Decision Button
+   ============================================================ */
+
+.btn-decision {
+    background: var(--forest);
+    color: var(--white);
+    width: auto;
+    white-space: nowrap;
+}
+
+.btn-decision:hover {
+    background: var(--mid);
+}
+
+/* ============================================================
+   Governance — Ready Modal Warning
+   ============================================================ */
+
+.ready-modal-warning {
+    background: rgba(212,163,115,0.1);
+    border: 1.5px solid rgba(212,163,115,0.3);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.ready-modal-warning p {
+    font-size: 0.88rem;
+    color: var(--text-mid);
+    line-height: 1.55;
+    margin-bottom: 0.5rem;
+}
+
+.ready-modal-warning p:last-child {
+    margin-bottom: 0;
+}
+
+.ready-modal-warning p strong {
+    color: var(--dark);
+}
+
+/* ============================================================
+   Governance — Discussion Summary Panel
+   ============================================================ */
+
+.discussion-summary-panel {
+    background: var(--white);
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,0.06);
+    padding: 1.25rem;
+}
+
+.discussion-summary-panel h3 {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--forest);
+    margin-bottom: 0.75rem;
+}
+
+.discussion-summary-content {
+    font-size: 0.88rem;
+    color: var(--text-mid);
+    line-height: 1.65;
+}
+
+.discussion-summary-content h4 {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--forest);
+    margin-top: 1rem;
+    margin-bottom: 0.4rem;
+}
+
+.discussion-summary-content h4:first-child {
+    margin-top: 0;
+}
+
+.discussion-summary-content ul {
+    padding-left: 1.2rem;
+    margin: 0.3rem 0;
+}
+
+.discussion-summary-content li {
+    margin-bottom: 0.3rem;
+}
+
+.discussion-summary-content strong {
+    color: var(--dark);
+}
+
+/* Summary stream in overlay */
+.summary-stream {
+    max-width: 600px;
+    width: 90%;
+    margin-top: 1rem;
+}
+
+.summary-stream-content {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.85);
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* ============================================================
+   Governance — Decision Banner
+   ============================================================ */
+
+.decision-banner {
+    background: var(--white);
+    border-radius: 12px;
+    border: 2px solid var(--forest);
+    padding: 1.5rem;
+    position: relative;
+}
+
+.decision-banner-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--forest);
+    color: var(--white);
+    font-size: 1.2rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.75rem;
+}
+
+.decision-banner-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--forest);
+    margin-bottom: 0.5rem;
+}
+
+.decision-banner-body {
+    font-size: 0.9rem;
+    color: var(--text-mid);
+    line-height: 1.6;
+    margin-bottom: 0.75rem;
+}
+
+.decision-banner-meta {
+    font-size: 0.78rem;
+    color: var(--leaf);
+}
+
+.decision-vote-tally {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--forest);
+    margin-bottom: 0.5rem;
+}
+
+.decision-minority {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(0,0,0,0.06);
+}
+
+.decision-minority-label {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--sand);
+    display: block;
+    margin-bottom: 0.3rem;
+}
+
+.decision-minority-item {
+    font-size: 0.82rem;
+    color: var(--text-mid);
+    line-height: 1.45;
+    margin-bottom: 0.25rem;
+    font-style: italic;
+}
+
+/* ============================================================
+   Governance — Decision Recording Modal
+   ============================================================ */
+
+.decision-modal {
+    max-width: 580px;
+}
+
+.decision-modal-intro {
+    font-size: 0.88rem;
+    color: var(--text-mid);
+    margin-bottom: 0.75rem;
+}
+
+.proposal-select-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.proposal-select-card {
+    cursor: pointer;
+    display: block;
+}
+
+.proposal-select-card input[type="radio"] {
+    display: none;
+}
+
+.proposal-select-card-inner {
+    border: 1.5px solid rgba(0,0,0,0.08);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.proposal-select-card input:checked + .proposal-select-card-inner {
+    border-color: var(--forest);
+    background: rgba(27,67,50,0.04);
+    box-shadow: 0 0 0 2px rgba(27,67,50,0.15);
+}
+
+.proposal-select-card:hover .proposal-select-card-inner {
+    border-color: var(--mid);
+    background: rgba(45,106,79,0.03);
+}
+
+.proposal-select-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+
+.proposal-select-card-title {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--forest);
+}
+
+.proposal-select-card-votes {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.vote-support-count {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--type-extension);
+}
+
+.vote-oppose-count {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--type-contradiction);
+}
+
+.proposal-select-card-summary {
+    font-size: 0.82rem;
+    color: var(--text-mid);
+    line-height: 1.5;
+    margin-bottom: 0.3rem;
+}
+
+.proposal-select-card-author {
+    font-size: 0.72rem;
+    color: var(--leaf);
+}
+
+.leader-badge {
+    display: inline-block;
+    padding: 0.1rem 0.45rem;
+    border-radius: 10px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    background: var(--type-extension);
+    color: var(--white);
+}
+
+.minority-warning {
+    background: rgba(212,163,115,0.12);
+    border: 1.5px solid rgba(212,163,115,0.35);
+    border-radius: 8px;
+    padding: 0.65rem 0.85rem;
+    font-size: 0.82rem;
+    color: var(--text-mid);
+    line-height: 1.5;
+}
+
+.minority-warning strong {
+    color: var(--sand);
+}
+
+/* ============================================================
+   Type Badge — Decision
+   ============================================================ */
+
+.type-decision {
+    background: var(--forest);
+    color: var(--white);
+}
+
+/* Decision item in node list */
+.decision-item {
+    border: 1.5px solid var(--forest) !important;
+    background: rgba(27,67,50,0.03);
+}
+
+/* Decision detail section (node page) */
+.decision-detail-section {
+    margin-top: 1.5rem;
+    padding: 1.25rem;
+    border-radius: 10px;
+    background: rgba(27,67,50,0.04);
+    border: 1px solid rgba(27,67,50,0.12);
+}
+
+.decision-resolved-proposal {
+    margin-bottom: 1rem;
+}
+
+.decision-resolved-label {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--leaf);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    display: block;
+    margin-bottom: 0.3rem;
+}
+
+/* ============================================================
+   Help Button & Modal
+   ============================================================ */
+
+.nav-help-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.35);
+    background: transparent;
+    color: rgba(255,255,255,0.7);
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-style: italic;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+    margin-left: 0.5rem;
+    flex-shrink: 0;
+}
+
+.nav-help-btn:hover {
+    border-color: var(--mint);
+    color: var(--white);
+    background: rgba(116,198,157,0.15);
+}
+
+.help-modal {
+    max-width: 560px;
+}
+
+.help-body {
+    gap: 0.5rem !important;
+}
+
+.help-section {
+    margin-bottom: 0.25rem;
+}
+
+.help-section h4 {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--forest);
+    margin-bottom: 0.3rem;
+}
+
+.help-section p {
+    font-size: 0.84rem;
+    color: var(--text-mid);
+    line-height: 1.55;
+    margin-bottom: 0.25rem;
+}
+
+.help-types {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0.4rem 0;
+}
+
+.help-cycle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.4rem 0;
+}
+
+.help-arrow {
+    color: var(--leaf);
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+/* ============================================================
    Responsive
    ============================================================ */
 

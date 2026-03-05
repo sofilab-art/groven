@@ -19,11 +19,13 @@ def init_db():
     conn = get_db()
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS spaces (
-            id          TEXT PRIMARY KEY,
-            title       TEXT NOT NULL,
-            description TEXT,
-            status      TEXT DEFAULT 'open',
-            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+            id                   TEXT PRIMARY KEY,
+            title                TEXT NOT NULL,
+            description          TEXT,
+            status               TEXT DEFAULT 'open',
+            discussion_summary   TEXT,
+            decided_at           DATETIME,
+            created_at           DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
         CREATE TABLE IF NOT EXISTS nodes (
@@ -41,10 +43,9 @@ def init_db():
             contested         BOOLEAN DEFAULT 0,
             is_question       BOOLEAN DEFAULT 0,
             proposal_summary  TEXT,
+            decision_meta     TEXT,
             created_at        DATETIME DEFAULT CURRENT_TIMESTAMP
         );
-
-        DROP TABLE IF EXISTS votes;
 
         CREATE TABLE IF NOT EXISTS votes (
             id            TEXT PRIMARY KEY,
@@ -56,6 +57,19 @@ def init_db():
             UNIQUE(node_id, author)
         );
     """)
+
+    # Migrate existing databases — add columns if missing
+    for col, default in [("discussion_summary", None), ("decided_at", None)]:
+        try:
+            conn.execute(f"ALTER TABLE spaces ADD COLUMN {col} TEXT")
+        except Exception:
+            pass
+    for col in ["decision_meta"]:
+        try:
+            conn.execute(f"ALTER TABLE nodes ADD COLUMN {col} TEXT")
+        except Exception:
+            pass
+
     conn.commit()
     conn.close()
 
@@ -84,13 +98,37 @@ def get_space(space_id):
     return dict(row) if row else None
 
 
-def create_space(id, title, description=None, status="open"):
+def create_space(id, title, description=None, status="open", discussion_summary=None,
+                 decided_at=None):
     """Create a new space."""
     conn = get_db()
     conn.execute(
-        "INSERT INTO spaces (id, title, description, status) VALUES (?, ?, ?, ?)",
-        (id, title, description, status)
+        """INSERT INTO spaces (id, title, description, status, discussion_summary, decided_at)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (id, title, description, status, discussion_summary, decided_at)
     )
+    conn.commit()
+    conn.close()
+
+
+def update_space_status(space_id, status):
+    """Update the status of a space."""
+    conn = get_db()
+    if status == "decided":
+        conn.execute(
+            "UPDATE spaces SET status = ?, decided_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (status, space_id)
+        )
+    else:
+        conn.execute("UPDATE spaces SET status = ? WHERE id = ?", (status, space_id))
+    conn.commit()
+    conn.close()
+
+
+def update_space_summary(space_id, summary):
+    """Store the LLM discussion summary on a space."""
+    conn = get_db()
+    conn.execute("UPDATE spaces SET discussion_summary = ? WHERE id = ?", (summary, space_id))
     conn.commit()
     conn.close()
 
@@ -147,7 +185,7 @@ def get_node_ancestors(node_id):
 def create_node(space_id, author, body, parent_id=None, node_type="seed",
                 branch_type=None, title=None, lineage_desc=None,
                 llm_proposed_type=None, llm_explanation=None, contested=0, id=None,
-                proposal_summary=None, is_question=0):
+                proposal_summary=None, is_question=0, decision_meta=None):
     """Create a new node and return its id."""
     node_id = id or str(uuid.uuid4())
     conn = get_db()
@@ -155,12 +193,12 @@ def create_node(space_id, author, body, parent_id=None, node_type="seed",
         INSERT INTO nodes (id, space_id, parent_id, node_type, branch_type,
                            author, title, body, lineage_desc,
                            llm_proposed_type, llm_explanation, contested,
-                           is_question, proposal_summary)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                           is_question, proposal_summary, decision_meta)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (node_id, space_id, parent_id, node_type, branch_type,
           author, title, body, lineage_desc,
           llm_proposed_type, llm_explanation, contested,
-          is_question, proposal_summary))
+          is_question, proposal_summary, decision_meta))
     conn.commit()
     conn.close()
     return node_id
@@ -173,10 +211,27 @@ def get_tree(space_id):
         SELECT id, space_id, parent_id, node_type, branch_type,
                author, title, body, lineage_desc,
                llm_proposed_type, llm_explanation, contested,
-               is_question, proposal_summary, created_at
+               is_question, proposal_summary, decision_meta, created_at
         FROM nodes
         WHERE space_id = ?
         ORDER BY created_at ASC
+    """, (space_id,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_synthesis_nodes(space_id):
+    """Return synthesis nodes in a space with their vote tallies."""
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT n.*,
+               COALESCE(SUM(CASE WHEN v.position = 'support' THEN 1 ELSE 0 END), 0) as vote_support,
+               COALESCE(SUM(CASE WHEN v.position = 'oppose' THEN 1 ELSE 0 END), 0) as vote_oppose
+        FROM nodes n
+        LEFT JOIN votes v ON v.node_id = n.id
+        WHERE n.space_id = ? AND n.branch_type = 'synthesis'
+        GROUP BY n.id
+        ORDER BY n.created_at ASC
     """, (space_id,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]

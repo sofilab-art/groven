@@ -17,9 +17,75 @@
                 {% for s in spaces_nav or [] %}
                 <a href="/space/{{ s.id }}" class="nav-link">{{ s.title|truncate(30) }}</a>
                 {% endfor %}
+                <button id="help-btn" class="nav-help-btn" title="How Groven works">i</button>
             </div>
         </div>
     </nav>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="review-modal-overlay" style="display:none;">
+        <div class="review-modal help-modal">
+            <div class="review-modal-header">
+                <h3>How Groven Works</h3>
+                <button type="button" id="help-modal-close" class="close-btn">&times;</button>
+            </div>
+            <div class="review-modal-body help-body">
+
+                <div class="help-section">
+                    <h4>Structured Deliberation</h4>
+                    <p>Groven organises discussion as a <strong>tree</strong>, not a flat thread. Every contribution is either a <strong>Seed</strong> (a root argument) or a <strong>Branch</strong> (a response to an existing node).</p>
+                </div>
+
+                <div class="help-section">
+                    <h4>Branch Types</h4>
+                    <p>Each branch carries a semantic type — proposed by the LLM, confirmed or overridden by you:</p>
+                    <div class="help-types">
+                        <span class="type-badge type-clarification">clarification</span>
+                        <span class="type-badge type-extension">extension</span>
+                        <span class="type-badge type-reframing">reframing</span>
+                        <span class="type-badge type-contradiction">contradiction</span>
+                        <span class="type-badge type-synthesis">synthesis</span>
+                    </div>
+                    <p>If you override the LLM's proposal, the node is marked <span class="contested-badge" style="font-size:0.72rem;">Contested</span> — making disagreement visible.</p>
+                </div>
+
+                <div class="help-section">
+                    <h4>Questions</h4>
+                    <p>Branches can also be flagged as <strong>questions</strong> — marked with a <strong>?</strong> in the graph. Questions signal an unresolved thread that needs attention.</p>
+                </div>
+
+                <div class="help-section">
+                    <h4>Synthesis &amp; Voting</h4>
+                    <p>When enough threads diverge, anyone can click <strong>Suggest synthesis</strong>. The LLM proposes 1–3 concrete proposals that connect divergent arguments. You choose which to accept — they become nodes in the graph.</p>
+                    <p>Every synthesis node is a <strong>votable proposal</strong>. Click one (purple halo) to read the proposal summary and cast your vote: <strong>Support</strong> or <strong>Oppose</strong>, each with a one-sentence justification. Anyone can vote, all positions are visible, and the vote arc gauge around each synthesis node shows the balance at a glance.</p>
+                    <p>Votes shape the decision but do not make it automatically — they are advisory. The next two steps turn votes into a binding outcome.</p>
+                </div>
+
+                <div class="help-section">
+                    <h4>From Discussion to Decision</h4>
+                    <div class="help-cycle">
+                        <span class="status-badge status-open">open</span>
+                        <span class="help-arrow">&rarr;</span>
+                        <span class="status-badge status-ready">ready</span>
+                        <span class="help-arrow">&rarr;</span>
+                        <span class="status-badge status-decided">decided</span>
+                    </div>
+                    <p><strong>Open</strong> — everyone contributes, discusses, requests syntheses, and votes on proposals. Two buttons appear: <em>Suggest synthesis</em> and <em>Declare Ready</em>.</p>
+                    <p><strong>Step 1 — Declare Ready.</strong> Someone clicks <em>Declare Ready</em>. This <strong>locks the discussion</strong>: no new branches, seeds, or syntheses. The LLM generates a structured summary of all positions. Voting on existing proposals stays open — this is the decision phase.</p>
+                    <p><strong>Step 2 — Record Decision.</strong> Someone clicks <em>Record Decision</em>. All synthesis proposals are presented <strong>ranked by vote balance</strong>, with the leading choice pre-selected. A different proposal can be chosen, but the decision-maker must justify the override. The decision is final and archived with a full vote snapshot.</p>
+                </div>
+
+                <div class="help-section">
+                    <h4>The Graph</h4>
+                    <p>Click any node for details and voting. Node colour = branch type. Dashed amber borders = contested. Purple halos = synthesis (with vote arcs). Gold halos = decision.</p>
+                </div>
+
+            </div>
+            <div class="review-modal-footer">
+                <button type="button" id="help-modal-ok" class="btn btn-primary" style="flex:1;">Got it</button>
+            </div>
+        </div>
+    </div>
     <main class="main-content">
         {% block content %}{% endblock %}
     </main>

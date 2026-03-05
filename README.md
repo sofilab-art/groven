@@ -29,7 +29,7 @@ The prototype ships with four pre-loaded discussion spaces — three in the cont
 
 - **Backend:** Python / Flask, SQLite
 - **Frontend:** Vanilla JS, D3.js v7 (CDN)
-- **LLM:** OpenAI gpt-5-mini (classification, titles, lineage, proposal summaries) + gpt-5.2 with reasoning (synthesis suggestions)
+- **LLM:** OpenAI gpt-5-mini (classification, titles, lineage, proposal summaries) + gpt-5.2 with reasoning (synthesis suggestions, discussion summaries)
 - No authentication, no SPA framework, no build step.
 
 ## Setup
@@ -86,9 +86,23 @@ Synthesis nodes are proposals. Participants can **Support** or **Oppose** with a
 
 Synthesis nodes display a **vote arc gauge** — a ring around the node that fills proportionally as votes come in. Green arcs show support, red arcs show opposition. Eight votes fill the full circle; below that, the remaining ring stays as a dashed purple halo, showing at a glance both the vote balance *and* whether enough people have voted. The gauge updates live after inline votes.
 
+### Governance cycle: Open → Ready → Decided
+
+Spaces follow a three-state governance cycle:
+
+1. **Open** — contributions and synthesis suggestions are accepted. Voting on existing synthesis proposals is active. Two action buttons appear in the header: *Suggest synthesis* and *Declare Ready*.
+
+2. **Ready** — discussion is locked (no new branches, seeds, or synthesis suggestions). When someone declares a space ready, the LLM (gpt-5.2) generates a **structured discussion summary** with three sections: Positions, Syntheses, and Open Forks. The summary streams progressively via SSE and is stored on the space. Voting on existing synthesis proposals remains active — this is the decision phase. A *Record Decision* button appears.
+
+3. **Decided** — a participant clicks *Record Decision*. All synthesis proposals are presented **ranked by vote balance**, with the leading choice pre-selected and marked with a **Leading** badge. A different proposal can be selected, but the modal warns that the choice overrides the majority preference and the justification prompt changes accordingly — creating social friction without a hard block. A **Decision node** is created as a child of the winning synthesis, with a snapshot of all votes (support, oppose, justifications) stored as `decision_meta` JSON. The space is permanently archived. A **decision banner** shows the outcome, vote breakdown, and minority positions.
+
+Decision nodes appear in the graph as large dark green circles with a white **✓** checkmark and a solid gold halo ring — visually distinct from all other node types.
+
+The seed data ships with all three states: `corpus-ai-training` (decided, with Decision node), `corpus-jury-composition` (ready, with discussion summary), and the other two spaces as open.
+
 ### Visualization
 
-D3.js force-directed graph. Node color = branch type. Node size distinguishes seeds from branches. Synthesis nodes have a dashed purple halo that doubles as the vote arc gauge background — green and red arcs fill in proportionally as votes arrive. Contested nodes have dashed amber borders. Question nodes display a white **?** on the circle. Click a node for inline detail and voting; hover for tooltip. Type badges append **?** for questions (e.g. "clarification?"). Arrows to synthesis nodes stop at the halo edge rather than the inner circle.
+D3.js force-directed graph. Node color = branch type. Node size distinguishes seeds from branches. Synthesis nodes have a dashed purple halo that doubles as the vote arc gauge background — green and red arcs fill in proportionally as votes arrive. Decision nodes have a solid gold halo, dark green fill, and a white checkmark. Contested nodes have dashed amber borders. Question nodes display a white **?** on the circle. Click a node for inline detail and voting; hover for tooltip. Type badges append **?** for questions (e.g. "clarification?"). Arrows to synthesis nodes stop at the halo edge rather than the inner circle.
 
 ## What this prototype does NOT include
 
@@ -105,14 +119,15 @@ D3.js force-directed graph. Node color = branch type. Node size distinguishes se
 main.py              Flask app, all routes
 db.py                SQLite schema + helpers (spaces, nodes, votes)
 llm.py               OpenAI API: classification, titles, lineage,
-                     reclassification, proposal summaries, synthesis suggestions
+                     reclassification, proposal summaries, synthesis suggestions,
+                     discussion summaries
 seed_data.py         Four pre-loaded discussion spaces
 static/
   style.css          Forest/mint/cream palette, Outfit font
   graph.js           D3.js force-directed graph + inline node detail/voting
   main.js            Form logic, review modal, synthesis suggestion modal
 templates/
-  base.html          Layout + nav
+  base.html          Layout + nav + help modal
   index.html         Space overview + new space modal
   space.html         Graph + contribution form + modals
   node.html          Node detail with lineage, voting, breadcrumb

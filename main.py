@@ -39,7 +39,11 @@ def space_view(space_id):
     if not space:
         return "Space not found", 404
     nodes = db.list_nodes(space_id)
-    return render_template("space.html", space=space, nodes=nodes)
+    synthesis_nodes = db.get_synthesis_nodes(space_id) if space["status"] == "ready" else []
+    # Sort by net support (support - oppose) descending so leading proposal is first
+    synthesis_nodes.sort(key=lambda s: (s.get("vote_support", 0) - s.get("vote_oppose", 0)), reverse=True)
+    return render_template("space.html", space=space, nodes=nodes,
+                           synthesis_nodes=synthesis_nodes)
 
 
 @app.route("/node/<node_id>")
@@ -115,8 +119,12 @@ def api_create_node():
     if not space_id or not author or not title or not body:
         return jsonify({"error": "space_id, author, title, and body are required"}), 400
 
-    if not db.get_space(space_id):
+    space = db.get_space(space_id)
+    if not space:
         return jsonify({"error": "Space not found"}), 404
+
+    if space["status"] != "open":
+        return jsonify({"error": "This space is closed for new contributions"}), 403
 
     # Determine node type
     branch_type = None
@@ -353,6 +361,119 @@ def api_regenerate_text():
     })
 
 
+# --- Governance transitions ---------------------------------------------------
+
+@app.route("/api/space/<space_id>/transition", methods=["POST"])
+def api_space_transition(space_id):
+    """Transition a space to Ready status. Streams a discussion summary via SSE."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON body"}), 400
+
+    target = (data.get("target_status") or "").strip()
+    author = (data.get("author") or "").strip()
+
+    if target != "ready":
+        return jsonify({"error": "Only open → ready transition is supported"}), 400
+    if not author:
+        return jsonify({"error": "author is required"}), 400
+
+    space = db.get_space(space_id)
+    if not space:
+        return jsonify({"error": "Space not found"}), 404
+    if space["status"] != "open":
+        return jsonify({"error": "Space is not open"}), 409
+
+    # Set status immediately so new contributions are blocked
+    db.update_space_status(space_id, "ready")
+
+    nodes = db.get_tree(space_id)
+    tallies = db.get_vote_tallies(space_id)
+
+    def stream():
+        full_summary = ""
+        yield f"data: {json.dumps({'event': 'status', 'status': 'ready'})}\n\n"
+
+        for event_type, payload in llm.generate_discussion_summary_stream(
+            space["title"], nodes, tallies
+        ):
+            if event_type == "chunk":
+                full_summary += payload
+                yield f"data: {json.dumps({'event': 'chunk', 'text': payload})}\n\n"
+            elif event_type == "done":
+                full_summary = payload
+                db.update_space_summary(space_id, full_summary)
+                yield f"data: {json.dumps({'event': 'done', 'summary': full_summary})}\n\n"
+            elif event_type == "error":
+                yield f"data: {json.dumps({'event': 'error', 'message': payload})}\n\n"
+
+        # If streaming completed without a done event, store whatever we got
+        if full_summary and not db.get_space(space_id).get("discussion_summary"):
+            db.update_space_summary(space_id, full_summary)
+
+    return Response(stream(), mimetype="text/event-stream",
+                    headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
+
+
+@app.route("/api/space/<space_id>/decide", methods=["POST"])
+def api_decide_space(space_id):
+    """Record a decision on a ready space. Creates a Decision node."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON body"}), 400
+
+    selected_node_id = (data.get("selected_node_id") or "").strip()
+    author = (data.get("author") or "").strip()
+    justification = (data.get("justification") or "").strip()
+
+    if not selected_node_id or not author or not justification:
+        return jsonify({"error": "selected_node_id, author, and justification are required"}), 400
+
+    space = db.get_space(space_id)
+    if not space:
+        return jsonify({"error": "Space not found"}), 404
+    if space["status"] != "ready":
+        return jsonify({"error": "Space must be in ready status to record a decision"}), 409
+
+    # Validate the selected node is a synthesis in this space
+    selected = db.get_node(selected_node_id)
+    if not selected or selected["space_id"] != space_id or selected["branch_type"] != "synthesis":
+        return jsonify({"error": "Selected node must be a synthesis proposal in this space"}), 400
+
+    # Snapshot votes
+    votes = db.get_votes_for_node(selected_node_id)
+    support = sum(1 for v in votes if v["position"] == "support")
+    oppose = sum(1 for v in votes if v["position"] == "oppose")
+    minority = [{"author": v["author"], "position": v["position"],
+                 "justification": v["justification"]}
+                for v in votes if v["position"] == "oppose"]
+
+    decision_meta = json.dumps({
+        "resolved_node_id": selected_node_id,
+        "vote_breakdown": {"support": support, "oppose": oppose},
+        "votes": [{"author": v["author"], "position": v["position"],
+                    "justification": v["justification"]} for v in votes],
+        "minority_positions": minority
+    })
+
+    # Create the Decision node
+    decision_id = db.create_node(
+        space_id=space_id,
+        parent_id=selected_node_id,
+        node_type="decision",
+        author=author,
+        title="Decision: " + (selected.get("title") or "Accepted proposal"),
+        body=justification,
+        proposal_summary=selected.get("proposal_summary") or "",
+        decision_meta=decision_meta
+    )
+
+    # Update space status
+    db.update_space_status(space_id, "decided")
+
+    return jsonify({"id": decision_id, "status": "decided"}), 201
+
+
 @app.route("/api/llm-propose")
 def api_llm_propose():
     """Get LLM type proposal for a branch."""
@@ -424,6 +545,9 @@ def api_suggest_synthesis(space_id):
     space = db.get_space(space_id)
     if not space:
         return jsonify({"error": "Space not found"}), 404
+
+    if space["status"] != "open":
+        return jsonify({"error": "This space is closed for new contributions"}), 403
 
     nodes = db.get_tree(space_id)
     if len(nodes) < 3:

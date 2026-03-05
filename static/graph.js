@@ -17,7 +17,8 @@
         extension: '#40916C',
         reframing: '#D4A373',
         contradiction: '#EF4444',
-        synthesis: '#8B5CF6'
+        synthesis: '#8B5CF6',
+        decision: '#1B4332'
     };
 
     const width = container.clientWidth || 800;
@@ -34,7 +35,7 @@
     // refX 20 → tip at ~12px from center (matches branch radius 12)
     // refX 33 → tip at ~20px from center (clears synthesis halo at r≈19)
     const defs = svg.append('defs');
-    [['arrowhead', 20], ['arrowhead-synthesis', 36]].forEach(([id, rx]) => {
+    [['arrowhead', 20], ['arrowhead-synthesis', 36], ['arrowhead-decision', 38]].forEach(([id, rx]) => {
         defs.append('marker')
             .attr('id', id)
             .attr('viewBox', '0 -5 10 10')
@@ -88,6 +89,7 @@
                 .force('charge', d3.forceManyBody().strength(-300))
                 .force('center', d3.forceCenter(width / 2, height / 2))
                 .force('collision', d3.forceCollide().radius(d =>
+                    d.node_type === 'decision' ? 32 :
                     d.node_type === 'seed' ? 28 : 22));
 
             // Draw links — synthesis targets use a marker with larger offset to clear the halo
@@ -99,9 +101,11 @@
                 .attr('stroke-opacity', 0.4)
                 .attr('stroke-width', 1.5)
                 .attr('marker-end', d =>
-                    d.target.branch_type === 'synthesis'
-                        ? 'url(#arrowhead-synthesis)'
-                        : 'url(#arrowhead)');
+                    d.target.node_type === 'decision'
+                        ? 'url(#arrowhead-decision)'
+                        : d.target.branch_type === 'synthesis'
+                            ? 'url(#arrowhead-synthesis)'
+                            : 'url(#arrowhead)');
 
             // Draw node groups
             const nodeGroup = g.append('g')
@@ -187,10 +191,20 @@
                 });
             };
 
+            // Decision node gold halo — solid ring signaling finality
+            nodeGroup.filter(d => d.node_type === 'decision')
+                .insert('circle', ':first-child')
+                .attr('r', 24)
+                .attr('fill', 'none')
+                .attr('stroke', '#D4A373')
+                .attr('stroke-width', 4)
+                .attr('stroke-opacity', 0.85);
+
             // Node circles
             nodeGroup.append('circle')
-                .attr('r', d => d.node_type === 'seed' ? 18 : 12)
+                .attr('r', d => d.node_type === 'decision' ? 20 : d.node_type === 'seed' ? 18 : 12)
                 .attr('fill', d => {
+                    if (d.node_type === 'decision') return typeColors.decision;
                     if (d.node_type === 'seed') return typeColors.seed;
                     return typeColors[d.branch_type] || '#999';
                 })
@@ -209,6 +223,17 @@
                 .attr('pointer-events', 'none')
                 .text('?');
 
+            // Decision checkmark overlay (✓ on decision nodes)
+            nodeGroup.filter(d => d.node_type === 'decision')
+                .append('text')
+                .attr('text-anchor', 'middle')
+                .attr('dominant-baseline', 'central')
+                .attr('font-size', '16px')
+                .attr('font-weight', '700')
+                .attr('fill', '#FFFFFF')
+                .attr('pointer-events', 'none')
+                .text('✓');
+
             // Title labels (wrap to 2 lines)
             nodeGroup.each(function (d) {
                 const label = d.title || d.author;
@@ -220,7 +245,7 @@
                     .attr('fill', '#374151')
                     .attr('font-weight', d.title ? '500' : '400');
 
-                const baseY = d.node_type === 'seed' ? 30 : 24;
+                const baseY = d.node_type === 'decision' ? 36 : d.node_type === 'seed' ? 30 : 24;
 
                 if (label.length <= maxChars) {
                     textEl.append('tspan')
@@ -246,14 +271,20 @@
             // Hover events
             nodeGroup
                 .on('mouseenter', (event, d) => {
-                    const typeLabel = d.branch_type || 'seed';
+                    const typeLabel = d.node_type === 'decision' ? 'decision' : (d.branch_type || 'seed');
                     const questionSuffix = d.is_question ? '?' : '';
                     const titleHtml = d.title
                         ? `<div class="tt-title">${d.title}</div>`
                         : '';
-                    const tallyHtml = (d.vote_support || d.vote_oppose)
-                        ? `<div class="vote-tally">${d.vote_support || 0} Support &middot; ${d.vote_oppose || 0} Oppose</div>`
-                        : '';
+                    let tallyHtml = '';
+                    if (d.node_type === 'decision' && d.decision_meta) {
+                        try {
+                            const meta = JSON.parse(d.decision_meta);
+                            tallyHtml = `<div class="vote-tally">${meta.vote_breakdown.support || 0} Support &middot; ${meta.vote_breakdown.oppose || 0} Oppose</div>`;
+                        } catch(e) {}
+                    } else if (d.vote_support || d.vote_oppose) {
+                        tallyHtml = `<div class="vote-tally">${d.vote_support || 0} Support &middot; ${d.vote_oppose || 0} Oppose</div>`;
+                    }
 
                     tooltip
                         .style('display', 'block')

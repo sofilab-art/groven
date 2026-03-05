@@ -23,7 +23,9 @@
         <!-- Header -->
         <header class="node-header">
             <div class="node-header-badges">
-                {% if node.branch_type %}
+                {% if node.node_type == 'decision' %}
+                <span class="type-badge type-decision">decision</span>
+                {% elif node.branch_type %}
                 <span class="type-badge type-{{ node.branch_type }}">{{ node.branch_type }}{% if node.is_question %}?{% endif %}</span>
                 {% else %}
                 <span class="type-badge type-seed">Seed</span>
@@ -43,6 +45,62 @@
         <div class="node-body">
             {{ node.body }}
         </div>
+
+        {% if node.node_type == 'decision' %}
+        <!-- Decision vote breakdown -->
+        <div class="decision-detail-section" id="decision-detail-section"
+             data-meta="{{ node.decision_meta | e if node.decision_meta else '{}' }}">
+            {% if node.proposal_summary %}
+            <div class="decision-resolved-proposal">
+                <span class="decision-resolved-label">Resolved proposal</span>
+                <blockquote class="proposal-quote">{{ node.proposal_summary }}</blockquote>
+            </div>
+            {% endif %}
+            <div id="decision-detail-votes"></div>
+        </div>
+
+        <script>
+        (function() {
+            const section = document.getElementById('decision-detail-section');
+            if (!section) return;
+            try {
+                const meta = JSON.parse(section.dataset.meta);
+                const s = meta.vote_breakdown ? meta.vote_breakdown.support || 0 : 0;
+                const o = meta.vote_breakdown ? meta.vote_breakdown.oppose || 0 : 0;
+
+                const container = document.getElementById('decision-detail-votes');
+                let html = '<div class="decision-vote-tally" style="font-size:1rem;margin-bottom:0.75rem;">' +
+                           s + ' Support &middot; ' + o + ' Oppose</div>';
+
+                if (meta.votes && meta.votes.length > 0) {
+                    html += '<div class="vote-list"><h3>All positions (' + meta.votes.length + ')</h3>';
+                    meta.votes.forEach(function(v) {
+                        html += '<div class="vote-item vote-item-' + v.position + '">' +
+                                '<div class="vote-item-header">' +
+                                '<span class="vote-author">' + v.author + '</span>' +
+                                '<span class="vote-position-badge vote-position-' + v.position + '">' + v.position + '</span>' +
+                                '</div>' +
+                                '<p class="vote-justification-text">' + v.justification + '</p>' +
+                                '</div>';
+                    });
+                    html += '</div>';
+                }
+
+                if (meta.minority_positions && meta.minority_positions.length > 0) {
+                    html += '<div class="decision-minority" style="margin-top:1rem;">' +
+                            '<span class="decision-minority-label">Minority positions</span>';
+                    meta.minority_positions.forEach(function(m) {
+                        html += '<div class="decision-minority-item"><strong>' + m.author + '</strong>: ' + m.justification + '</div>';
+                    });
+                    html += '</div>';
+                }
+
+                container.innerHTML = html;
+            } catch(e) {}
+        })();
+        </script>
+
+        {% else %}
 
         <!-- Lineage description -->
         {% if node.lineage_desc %}
@@ -163,16 +221,20 @@
         </script>
         {% endif %}
 
+        {% endif %}
+
         <!-- Children -->
         {% if children %}
         <div class="children-section">
             <h2>Branches ({{ children|length }})</h2>
             <div class="children-list">
                 {% for child in children %}
-                <a href="/node/{{ child.id }}" class="node-list-item {% if child.contested %}contested{% endif %}">
+                <a href="/node/{{ child.id }}" class="node-list-item {% if child.contested %}contested{% endif %} {% if child.node_type == 'decision' %}decision-item{% endif %}">
                     <div class="node-list-header">
                         <span class="node-author">{{ child.author }}</span>
-                        {% if child.branch_type %}
+                        {% if child.node_type == 'decision' %}
+                        <span class="type-badge type-decision">decision</span>
+                        {% elif child.branch_type %}
                         <span class="type-badge type-{{ child.branch_type }}">{{ child.branch_type }}{% if child.is_question %}?{% endif %}</span>
                         {% endif %}
                         {% if child.contested %}

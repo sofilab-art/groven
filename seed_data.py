@@ -11,7 +11,23 @@ SPACES = [
         "id": "corpus-ai-training",
         "title": "Should AI training licenses be time-limited?",
         "description": "Discussion about time-limiting licenses that allow training AI models on copyrighted works.",
-        "status": "open"
+        "status": "decided",
+        "discussion_summary": """## Positions
+
+- **Time-limited licenses** (Amara): Licenses should expire after 2 years, creating a recurring market and preserving creator bargaining power.
+- **Model-version triggers** (Jonas): Each new model generation should require a fresh license, coupling licensing to technological progress.
+- **Structural skepticism** (Fatima): Time limits alone don't solve the power imbalance — publishers will use blanket framework agreements to circumvent them.
+- **Scope over time** (Amara, responding to Fatima): The real problem isn't the time axis but the scope of licenses — they must be model-specific.
+
+## Syntheses
+
+- **Model-bound, non-transferable licenses** (Jonas): Combines model-version triggers with anti-blanket clauses into a unified principle — licenses are bound to specific model versions, expire with the generation, and cannot cover unknown future systems. Vote: 2 Support, 1 Oppose.
+
+## Open Forks
+
+- **Definition of 'training run'** (Yuki): The technical boundary between fine-tuning, continual learning, and distillation remains unresolved — without it, enforcement is impossible.
+- **Framework agreement loophole**: Fatima's concern about blanket deals was reframed but not fully resolved — the anti-blanket clause needs legal specification.""",
+        "decided_at": "2026-03-01 14:30:00"
     },
     {
         "id": "corpus-revenue-split",
@@ -23,7 +39,21 @@ SPACES = [
         "id": "corpus-jury-composition",
         "title": "Who should sit on the governance jury?",
         "description": "Question of how to compose and select the governance jury that votes on platform decisions.",
-        "status": "ready"
+        "status": "ready",
+        "discussion_summary": """## Positions
+
+- **Sortition with stratification** (Nadia, Felix): The jury should be drawn by lot from the contributor pool, stratified across three dimensions — region, genre, and career stage — to ensure representativeness without elections.
+- **Statistical feasibility concern** (Kwame): With fewer than ~150 contributors, random selection produces unrepresentative samples. Sortition only works at scale.
+- **Phased approach** (Nadia): Below 100 contributors, everyone participates directly. Above 100, sortition activates. The threshold triggers automatically.
+
+## Syntheses
+
+- **Phased model with stratification** (Felix): Full participation below 100 contributors, stratified sortition above 100. The first jury defines its own succession rules (term length, re-selection eligibility). Vote: 2 Support, 1 Oppose.
+
+## Open Forks
+
+- **Jury term length and re-selection**: Amara's clarification about term duration (3 months vs. 2 years) and whether re-selection is allowed remains unresolved — deferred to the first jury's self-governance.
+- **Self-determination risk**: Amara opposes letting the first jury define succession rules, arguing this concentrates too much power in one initial random draw."""
     },
     {
         "id": "ensemble-lachenmann",
@@ -41,6 +71,7 @@ S1_B2      = "s1-branch2-yuki"
 S1_B3      = "s1-branch3-fatima"
 S1_B4      = "s1-branch4-amara"
 S1_B5      = "s1-branch5-jonas"
+S1_DEC     = "s1-decision"
 
 # Space 2: corpus-revenue-split
 S2_SEED    = "s2-seed-kwame"
@@ -158,6 +189,24 @@ NODES = [
         "llm_proposed_type": "synthesis",
         "llm_explanation": "This branch explicitly connects two earlier lines of argument into a unified licensing principle. This matches the synthesis type as it reconciles the version-trigger and anti-blanket-clause ideas.",
         "contested": 0
+    },
+
+    # Decision node for corpus-ai-training
+    {
+        "id": S1_DEC,
+        "space_id": "corpus-ai-training",
+        "parent_id": S1_B5,
+        "node_type": "decision",
+        "branch_type": None,
+        "author": "Amara",
+        "title": "Decision: Consistent principle: model-bound, non-transferable licenses",
+        "body": "The synthesis by Jonas captures the emerging consensus: licenses should be bound to specific model versions, expire with the model generation, and cannot be granted in advance for unknown future systems. While Fatima's concern about framework agreements remains valid, the model-bound principle provides the strongest available safeguard. Yuki's definitional work on 'training run' will be critical for the legal formulation.",
+        "lineage_desc": None,
+        "llm_proposed_type": None,
+        "llm_explanation": None,
+        "contested": 0,
+        "proposal_summary": "Licenses are bound to specific model versions, expire with the model generation, and cannot be granted in advance for unknown future systems.",
+        "decision_meta": '{"resolved_node_id": "s1-branch5-jonas", "vote_breakdown": {"support": 2, "oppose": 1}, "votes": [{"author": "Amara", "position": "support", "justification": "This captures the intent of my original time-limit proposal better than I could."}, {"author": "Yuki", "position": "support", "justification": "Model-bound licensing makes the \'training run\' definition enforceable."}, {"author": "Fatima", "position": "oppose", "justification": "Framework agreements will still circumvent per-model licensing in practice."}], "minority_positions": [{"author": "Fatima", "position": "oppose", "justification": "Framework agreements will still circumvent per-model licensing in practice."}]}'
     },
 
     # =========================================================================

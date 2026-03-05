@@ -717,3 +717,286 @@
         }
     });
 })();
+
+// ============================================================
+// Declare Ready Modal (space page — open status)
+// ============================================================
+
+(function () {
+    const btn = document.getElementById('declare-ready-btn');
+    if (!btn) return;
+
+    const modal = document.getElementById('ready-modal');
+    const overlay = document.getElementById('analyzing-overlay');
+    const overlayText = document.getElementById('analyzing-text');
+    const summaryStream = document.getElementById('summary-stream');
+    const summaryContent = document.getElementById('summary-stream-content');
+    const graphContainer = document.getElementById('forest-graph');
+    const spaceId = graphContainer ? graphContainer.dataset.spaceId : null;
+
+    if (!modal || !spaceId) return;
+
+    function openModal() {
+        document.getElementById('ready-author').value = '';
+        modal.style.display = 'flex';
+        document.getElementById('ready-author').focus();
+    }
+
+    function closeModal() {
+        modal.style.display = 'none';
+    }
+
+    btn.addEventListener('click', openModal);
+    document.getElementById('ready-cancel').addEventListener('click', closeModal);
+    document.getElementById('ready-modal-close').addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    document.getElementById('ready-confirm').addEventListener('click', async () => {
+        const author = document.getElementById('ready-author').value.trim();
+        if (!author) {
+            alert('Please enter your name.');
+            return;
+        }
+
+        closeModal();
+
+        // Show overlay with summary stream
+        if (overlayText) overlayText.textContent = 'Generating discussion summary...';
+        if (overlay) overlay.style.display = 'flex';
+        if (summaryStream) { summaryStream.style.display = 'block'; summaryContent.textContent = ''; }
+
+        try {
+            const resp = await fetch(`/api/space/${spaceId}/transition`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target_status: 'ready', author: author })
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json();
+                alert(err.error || 'Failed to transition space.');
+                if (overlay) overlay.style.display = 'none';
+                return;
+            }
+
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+
+                while (buffer.includes('\n\n')) {
+                    const idx = buffer.indexOf('\n\n');
+                    const block = buffer.slice(0, idx);
+                    buffer = buffer.slice(idx + 2);
+
+                    let data = '';
+                    for (const line of block.split('\n')) {
+                        if (line.startsWith('data: ')) data = line.slice(6);
+                    }
+                    if (!data) continue;
+
+                    const parsed = JSON.parse(data);
+                    if (parsed.event === 'chunk') {
+                        if (summaryContent) {
+                            summaryContent.textContent += parsed.text;
+                            summaryContent.scrollTop = summaryContent.scrollHeight;
+                        }
+                    } else if (parsed.event === 'done') {
+                        // Summary complete — reload to show Ready state
+                        window.location.reload();
+                        return;
+                    } else if (parsed.event === 'error') {
+                        alert(parsed.message || 'Error generating summary.');
+                    }
+                }
+            }
+
+            // Fallback reload
+            window.location.reload();
+        } catch (err) {
+            console.error('[Ready] Error:', err);
+            alert('Network error. Please try again.');
+            if (overlay) overlay.style.display = 'none';
+        }
+    });
+})();
+
+// ============================================================
+// Record Decision Modal (space page — ready status)
+// ============================================================
+
+(function () {
+    const btn = document.getElementById('record-decision-btn');
+    if (!btn) return;
+
+    const modal = document.getElementById('decision-modal');
+    const graphContainer = document.getElementById('forest-graph');
+    const spaceId = graphContainer ? graphContainer.dataset.spaceId : null;
+
+    if (!modal || !spaceId) return;
+
+    const minorityWarning = document.getElementById('minority-warning');
+    const justificationHint = document.getElementById('decision-justification-hint');
+
+    function updateMinorityWarning() {
+        const selected = modal.querySelector('input[name="selected_proposal"]:checked');
+        if (!selected) {
+            if (minorityWarning) minorityWarning.style.display = 'none';
+            return;
+        }
+        const isLeader = selected.dataset.isLeader === 'true';
+        if (minorityWarning) {
+            minorityWarning.style.display = isLeader ? 'none' : 'block';
+        }
+        if (justificationHint) {
+            justificationHint.textContent = isLeader
+                ? 'Why was this proposal chosen? Note any key factors.'
+                : 'This is not the leading proposal — explain why it should be chosen over the majority preference.';
+        }
+    }
+
+    // Listen for proposal selection changes
+    modal.querySelectorAll('input[name="selected_proposal"]').forEach(r => {
+        r.addEventListener('change', updateMinorityWarning);
+    });
+
+    function openModal() {
+        document.getElementById('decision-author').value = '';
+        document.getElementById('decision-justification').value = '';
+        // Re-select leader (first radio, which is pre-checked in template)
+        const radios = modal.querySelectorAll('input[name="selected_proposal"]');
+        radios.forEach((r, i) => { r.checked = (i === 0); });
+        updateMinorityWarning();
+        modal.style.display = 'flex';
+    }
+
+    function closeModal() {
+        modal.style.display = 'none';
+    }
+
+    btn.addEventListener('click', openModal);
+    document.getElementById('decision-cancel').addEventListener('click', closeModal);
+    document.getElementById('decision-modal-close').addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    document.getElementById('decision-confirm').addEventListener('click', async () => {
+        const selected = modal.querySelector('input[name="selected_proposal"]:checked');
+        const author = document.getElementById('decision-author').value.trim();
+        const justification = document.getElementById('decision-justification').value.trim();
+
+        if (!selected) {
+            alert('Please select a synthesis proposal.');
+            return;
+        }
+        if (!author) {
+            alert('Please enter your name.');
+            return;
+        }
+        if (!justification) {
+            alert('Please provide a justification for this decision.');
+            return;
+        }
+
+        const confirmBtn = document.getElementById('decision-confirm');
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Recording...';
+
+        try {
+            const resp = await fetch(`/api/space/${spaceId}/decide`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    selected_node_id: selected.value,
+                    author: author,
+                    justification: justification
+                })
+            });
+
+            if (resp.ok) {
+                window.location.reload();
+            } else {
+                const err = await resp.json();
+                alert(err.error || 'Failed to record decision.');
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Record Decision';
+            }
+        } catch (err) {
+            console.error('[Decision] Error:', err);
+            alert('Network error. Please try again.');
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Record Decision';
+        }
+    });
+})();
+
+// ============================================================
+// Decision Banner — render vote breakdown from decision_meta
+// ============================================================
+
+(function () {
+    const el = document.getElementById('decision-banner-votes');
+    if (!el) return;
+
+    try {
+        const meta = JSON.parse(el.dataset.meta);
+        const s = meta.vote_breakdown.support || 0;
+        const o = meta.vote_breakdown.oppose || 0;
+
+        let html = `<div class="decision-vote-tally">${s} Support &middot; ${o} Oppose</div>`;
+
+        if (meta.minority_positions && meta.minority_positions.length > 0) {
+            html += '<div class="decision-minority"><span class="decision-minority-label">Minority positions:</span>';
+            meta.minority_positions.forEach(m => {
+                html += `<div class="decision-minority-item"><strong>${m.author}</strong>: ${m.justification}</div>`;
+            });
+            html += '</div>';
+        }
+
+        el.innerHTML = html;
+    } catch (e) {
+        // decision_meta not parseable — skip
+    }
+})();
+
+// ============================================================
+// Discussion summary — render markdown-like content
+// ============================================================
+
+(function () {
+    const el = document.getElementById('discussion-summary-content');
+    if (!el) return;
+
+    // Simple markdown: ## headers, **bold**, bullet lists
+    let text = el.textContent;
+    text = text.replace(/^## (.+)$/gm, '<h4>$1</h4>');
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/^- (.+)$/gm, '<li>$1</li>');
+    text = text.replace(/(<li>.*<\/li>\n?)+/gs, '<ul>$&</ul>');
+    text = text.replace(/\n\n/g, '<br><br>');
+    el.innerHTML = text;
+})();
+
+// ============================================================
+// Help Modal
+// ============================================================
+
+(function () {
+    const btn = document.getElementById('help-btn');
+    const modal = document.getElementById('help-modal');
+    if (!btn || !modal) return;
+
+    function openHelp() { modal.style.display = 'flex'; }
+    function closeHelp() { modal.style.display = 'none'; }
+
+    btn.addEventListener('click', openHelp);
+    document.getElementById('help-modal-close').addEventListener('click', closeHelp);
+    document.getElementById('help-modal-ok').addEventListener('click', closeHelp);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeHelp(); });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.style.display !== 'none') closeHelp();
+    });
+})();
