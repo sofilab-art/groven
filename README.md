@@ -72,7 +72,7 @@ Open http://localhost:5000. Seed data loads automatically on first start.
 2. The analysis streams progressively via SSE: classification arrives first and the review modal opens immediately; title and lineage generate in parallel and fill in as they arrive (animated loading stripes show progress)
 3. LLM proposes a branch type, detects whether it's a question, generates a title, lineage description, and two-sentence explanation. Question titles are phrased as questions ending with **?** to spark conversation
 4. Author reviews everything in a modal — can edit title and lineage, confirm or override the type, and toggle the "This is a question" checkbox
-5. If the author picks a different type, the LLM rethinks and explains why the author's reading is reasonable
+5. If the author picks a different type, the LLM rethinks and explains why the author's reading is reasonable. A **Regenerate ↻** link appears next to the title field, offering to regenerate title and lineage for the new type (since both were generated based on the original classification). Clicking it is optional — the author's manual edits are never overwritten automatically
 6. If overridden, the node is flagged as **contested**
 7. The graph updates — contested nodes have a dashed border, question nodes show a **?** overlay
 

@@ -282,14 +282,19 @@
 
         // Reclassify when the user picks a different type
         let reclassifyController = null;
+        const regenLink = document.getElementById('regen-title-lineage');
+
         reviewModal.querySelectorAll('input[name="review_branch_type"]').forEach(radio => {
             radio.addEventListener('change', async () => {
                 const preview = reviewModal._preview;
                 const payload = reviewModal._payload;
                 if (!preview || !payload) return;
 
-                // Skip if user picked the same type as LLM proposed
-                if (radio.value === preview.proposed_type) return;
+                // If user switched back to original type, hide regenerate link
+                if (radio.value === preview.proposed_type) {
+                    if (regenLink) regenLink.style.display = 'none';
+                    return;
+                }
 
                 // Abort any in-flight reclassify request
                 if (reclassifyController) reclassifyController.abort();
@@ -323,6 +328,9 @@
                         const qCb = document.getElementById('review-is-question');
                         if (qCb) qCb.checked = !!data.is_question;
                     }
+
+                    // Show regenerate link — title/lineage were based on old type
+                    if (regenLink) regenLink.style.display = '';
                 } catch (err) {
                     if (err.name !== 'AbortError') {
                         console.error('[Reclassify] Error:', err);
@@ -330,6 +338,54 @@
                 }
             });
         });
+
+        // Regenerate title & lineage for the overridden type
+        if (regenLink) {
+            regenLink.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const payload = reviewModal._payload;
+                if (!payload) return;
+
+                const selectedType = reviewModal.querySelector('input[name="review_branch_type"]:checked');
+                if (!selectedType) return;
+
+                const qCb = document.getElementById('review-is-question');
+                const titleInput = document.getElementById('review-title');
+                const lineageInput = document.getElementById('review-lineage');
+
+                // Loading state
+                regenLink.classList.add('loading');
+                regenLink.textContent = 'Regenerating...';
+                titleInput.classList.add('field-loading');
+                lineageInput.classList.add('field-loading');
+
+                try {
+                    const resp = await fetch('/api/node/regenerate-text', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            parent_id: payload.parent_id,
+                            body: payload.body,
+                            branch_type: selectedType.value,
+                            is_question: qCb ? qCb.checked : false
+                        })
+                    });
+
+                    const data = await resp.json();
+                    if (data.suggested_title) titleInput.value = data.suggested_title;
+                    if (data.lineage_desc) lineageInput.value = data.lineage_desc;
+
+                    regenLink.style.display = 'none';
+                } catch (err) {
+                    console.error('[Regenerate] Error:', err);
+                } finally {
+                    regenLink.classList.remove('loading');
+                    regenLink.textContent = 'Regenerate ↻';
+                    titleInput.classList.remove('field-loading');
+                    lineageInput.classList.remove('field-loading');
+                }
+            });
+        }
 
         document.getElementById('review-confirm').addEventListener('click', async () => {
             const payload = reviewModal._payload;

@@ -321,6 +321,38 @@ def api_reclassify_node():
         })
 
 
+@app.route("/api/node/regenerate-text", methods=["POST"])
+def api_regenerate_text():
+    """Regenerate title and lineage description for a new branch type."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON body"}), 400
+
+    parent_id = data.get("parent_id")
+    body = (data.get("body") or "").strip()
+    branch_type = (data.get("branch_type") or "").strip()
+    is_question = data.get("is_question", False)
+
+    if not parent_id or not body or not branch_type:
+        return jsonify({"error": "parent_id, body, and branch_type are required"}), 400
+
+    parent_node = db.get_node(parent_id)
+    if not parent_node:
+        return jsonify({"error": "Parent node not found"}), 404
+
+    parent_body = parent_node["body"]
+
+    # Generate title and lineage in parallel
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        title_future = pool.submit(llm.generate_title, parent_body, body, branch_type, is_question)
+        lineage_future = pool.submit(llm.generate_lineage, parent_body, body, branch_type)
+
+    return jsonify({
+        "suggested_title": title_future.result(),
+        "lineage_desc": lineage_future.result()
+    })
+
+
 @app.route("/api/llm-propose")
 def api_llm_propose():
     """Get LLM type proposal for a branch."""
