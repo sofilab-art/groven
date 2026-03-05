@@ -203,6 +203,45 @@ def generate_title(parent_body, branch_body, branch_type):
         return "Untitled branch"
 
 
+PROPOSAL_SUMMARY_SYSTEM_PROMPT = """You summarise proposals for a deliberation platform.
+
+Given a synthesis proposal, write a single sentence (max 30 words) that captures the core
+actionable recommendation. Start with a verb. Do not add quotes or preamble."""
+
+PROPOSAL_SUMMARY_USER_TEMPLATE = """Proposal:
+---
+{body}
+---
+
+Write a one-sentence summary."""
+
+
+def generate_proposal_summary(body):
+    """
+    Summarise a synthesis proposal in one sentence using gpt-5-mini.
+    Returns a string, or a truncated fallback on error.
+    """
+    try:
+        cl = _get_client()
+        user_message = PROPOSAL_SUMMARY_USER_TEMPLATE.format(body=body)
+
+        response = cl.chat.completions.create(
+            model="gpt-5-mini",
+            messages=[
+                {"role": "system", "content": PROPOSAL_SUMMARY_SYSTEM_PROMPT},
+                {"role": "user", "content": user_message}
+            ],
+            max_completion_tokens=512,
+            timeout=10
+        )
+
+        return response.choices[0].message.content.strip()
+
+    except Exception as e:
+        print(f"[LLM] Proposal summary error: {e}")
+        return body[:150] + "..." if len(body) > 150 else body
+
+
 RECLASSIFY_SYSTEM_PROMPT = """You are a semantic classification assistant for Groven,
 a structured deliberation platform.
 
@@ -277,4 +316,134 @@ def reclassify(parent_body, branch_body, original_type, original_explanation, ch
 
     except Exception as e:
         print(f"[LLM] Reclassify error: {e}")
+        return None
+
+
+SYNTHESIS_SUGGEST_SYSTEM_PROMPT = """You are a synthesis advisor for Groven, a structured deliberation platform.
+
+Your task: analyse a complete discussion tree and suggest 1-3 opportunities where
+a synthesis node could connect divergent or complementary threads.
+
+Think step by step before producing your answer:
+1. Map the tree structure — identify which threads diverge or complement each other.
+2. For each pair or cluster of threads, ask: can these be reconciled into a single
+   actionable proposal? If yes, draft the synthesis.
+3. Verify each suggestion references real node IDs and that no existing synthesis
+   already covers the same connection.
+
+A synthesis connects two or more existing lines of thought, reconciling or
+integrating divergent branches into a coherent position.
+
+Each suggestion must:
+1. Identify a primary parent node (the node it most directly responds to)
+2. Identify 1-3 other referenced nodes whose ideas it integrates
+3. Propose a body text for the synthesis (2-4 sentences). IMPORTANT: the body must
+   synthesize the referenced threads into a clear, actionable proposal — a concrete
+   position or recommendation that participants can support or oppose. Do not merely
+   summarise the threads; state what should be done.
+4. Propose a short title (max 8 words) that captures the proposal
+5. Explain why this synthesis makes sense (1-2 sentences)
+
+Only suggest syntheses where genuinely different perspectives can be connected.
+Do NOT suggest syntheses between nodes that already agree.
+Do NOT suggest a synthesis if one already exists that covers the same connection.
+
+Respond ONLY with valid JSON. No preamble, no explanation outside the JSON.
+
+{
+  "suggestions": [
+    {
+      "parent_id": "<id of the primary parent node>",
+      "referenced_ids": ["<id1>", "<id2>"],
+      "title": "<max 8 words>",
+      "body": "<2-4 sentences synthesising the referenced threads>",
+      "reasoning": "<1-2 sentences explaining why this synthesis is valuable>"
+    }
+  ]
+}"""
+
+SYNTHESIS_SUGGEST_USER_TEMPLATE = """Discussion space: {space_title}
+
+Here is the complete discussion tree. Each node has an id, parent_id (null for seeds),
+branch_type, author, title, and body.
+
+{nodes_json}
+
+Existing synthesis nodes (do not re-suggest these connections):
+{existing_syntheses}
+
+Suggest 1-3 synthesis opportunities."""
+
+
+def suggest_synthesis(space_title, nodes):
+    """
+    Analyse all nodes in a space and suggest 1-3 synthesis opportunities.
+    Uses gpt-5.2 with reasoning enabled for deeper analytical thinking.
+    Returns list of suggestion dicts, or None on error.
+    """
+    try:
+        cl = _get_client()
+
+        # Build compact node descriptions
+        node_descriptions = []
+        existing_syntheses = []
+        valid_ids = {n["id"] for n in nodes}
+
+        for n in nodes:
+            body = n["body"][:300] + "..." if len(n["body"]) > 300 else n["body"]
+            node_descriptions.append({
+                "id": n["id"],
+                "parent_id": n["parent_id"],
+                "branch_type": n["branch_type"] or "seed",
+                "author": n["author"],
+                "title": n["title"] or "(untitled)",
+                "body": body
+            })
+            if n["branch_type"] == "synthesis":
+                existing_syntheses.append(
+                    f"- {n['title']} (id: {n['id']}, connects to parent {n['parent_id']})"
+                )
+
+        nodes_json = json.dumps(node_descriptions, indent=2)
+        syntheses_text = "\n".join(existing_syntheses) if existing_syntheses else "(none yet)"
+
+        user_message = SYNTHESIS_SUGGEST_USER_TEMPLATE.format(
+            space_title=space_title,
+            nodes_json=nodes_json,
+            existing_syntheses=syntheses_text
+        )
+
+        response = cl.chat.completions.create(
+            model="gpt-5.2",
+            messages=[
+                {"role": "system", "content": SYNTHESIS_SUGGEST_SYSTEM_PROMPT},
+                {"role": "user", "content": user_message}
+            ],
+            max_completion_tokens=4096,
+            reasoning_effort="low",
+            timeout=30
+        )
+
+        content = response.choices[0].message.content.strip()
+        if content.startswith("```"):
+            content = content.split("\n", 1)[1] if "\n" in content else content[3:]
+            if content.endswith("```"):
+                content = content[:-3]
+            content = content.strip()
+
+        result = json.loads(content)
+        suggestions = result.get("suggestions", [])
+
+        # Validate node IDs exist
+        validated = []
+        for s in suggestions:
+            if s.get("parent_id") not in valid_ids:
+                continue
+            s["referenced_ids"] = [rid for rid in s.get("referenced_ids", []) if rid in valid_ids]
+            validated.append(s)
+
+        return validated if validated else None
+
+    except Exception as e:
+        print(f"[LLM] Synthesis suggestion error: {e}")
         return None

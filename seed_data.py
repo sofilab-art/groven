@@ -1,6 +1,6 @@
 """
 Seed data for Groven prototype.
-Three pre-loaded discussion spaces in the CORPUS context.
+Pre-loaded discussion spaces for demonstration.
 All content in English.
 """
 
@@ -24,6 +24,12 @@ SPACES = [
         "title": "Who should sit on the governance jury?",
         "description": "Question of how to compose and select the governance jury that votes on platform decisions.",
         "status": "ready"
+    },
+    {
+        "id": "ensemble-lachenmann",
+        "title": "Should our ensemble perform Helmut Lachenmann?",
+        "description": "Ten musicians debate whether to programme Lachenmann: rehearsal demands, audience readiness, programming strategy, and a two-season phased proposal.",
+        "status": "open"
     }
 ]
 
@@ -50,6 +56,19 @@ S3_B2      = "s3-branch2-amara"
 S3_B3      = "s3-branch3-kwame"
 S3_B4      = "s3-branch4-nadia"
 S3_B5      = "s3-branch5-felix"
+
+# Space 4: ensemble-lachenmann
+S4_SEED    = "s4-seed-clara"
+S4_B1      = "s4-branch1-marcus"
+S4_B2      = "s4-branch2-reiko"
+S4_B3      = "s4-branch3-tomas"
+S4_B4      = "s4-branch4-yuna"
+S4_B5      = "s4-branch5-dmitri"
+S4_B6      = "s4-branch6-aisha"
+S4_B7      = "s4-branch7-felix"
+S4_B8      = "s4-branch8-priya"
+S4_B9      = "s4-branch9-leo"
+S4_B10     = "s4-branch10-sofia"
 
 NODES = [
     # =========================================================================
@@ -215,7 +234,7 @@ NODES = [
     },
 
     # =========================================================================
-    # SPACE 3: corpus-jury-composition
+    # SPACE 3: corpus-jury-composition (CORPUS context)
     # =========================================================================
     {
         "id": S3_SEED,
@@ -301,6 +320,207 @@ NODES = [
         "llm_explanation": "This branch adds the novel idea that the first jury should define its own succession rules. It extends beyond mere synthesis into new governance territory.",
         "contested": 1
     },
+
+    # =========================================================================
+    # SPACE 4: ensemble-lachenmann
+    # =========================================================================
+    {
+        "id": S4_SEED,
+        "space_id": "ensemble-lachenmann",
+        "parent_id": None,
+        "node_type": "seed",
+        "branch_type": None,
+        "author": "Clara",
+        "title": "Proposing Lachenmann for next season",
+        "body": "I believe our ensemble should programme a Lachenmann piece for the upcoming season. His music demands extreme extended techniques and a rethinking of what sound means in a concert setting. It would challenge us technically, attract contemporary music audiences, and position us as a forward-looking group. The rehearsal investment is significant but the artistic payoff could define our identity for years.",
+        "lineage_desc": None,
+        "llm_proposed_type": None,
+        "llm_explanation": None,
+        "contested": 0
+    },
+    {
+        "id": S4_B1,
+        "space_id": "ensemble-lachenmann",
+        "parent_id": S4_SEED,
+        "node_type": "branch",
+        "branch_type": "extension",
+        "author": "Marcus",
+        "title": "Program Lachenmann with Sciarrino for contrast",
+        "body": "If we commit to Lachenmann, we should pair it with Salvatore Sciarrino on the same programme. Both composers explore the threshold of audibility, but Sciarrino approaches it from an Italian bel canto tradition while Lachenmann comes from the German materialist school. The contrast would make each piece illuminate the other and give the audience two entry points into radical sound-worlds rather than one.",
+        "lineage_desc": "Building on the recommendation to program Lachenmann, this extension proposes pairing his work with Salvatore Sciarrino so the contrast between Lachenmann\u2019s German materialist approach and Sciarrino\u2019s Italian bel canto\u2013inflected threshold-of-audibility will illuminate both pieces and give audiences two complementary entry points into radical sound-worlds.",
+        "llm_proposed_type": "extension",
+        "llm_explanation": "The Branch proposes pairing Lachenmann with Sciarrino to complement and expand the proposed programme, arguing that the contrast between their approaches will illuminate each piece and broaden audience entry points. This is an extension because it builds on and supports the parent\u2019s proposal by carrying the programming idea into new territory without objecting to or reframing the original suggestion.",
+        "contested": 0
+    },
+    {
+        "id": S4_B2,
+        "space_id": "ensemble-lachenmann",
+        "parent_id": S4_SEED,
+        "node_type": "branch",
+        "branch_type": "contradiction",
+        "author": "Reiko",
+        "title": "Lachenmann requires prohibitive rehearsal time",
+        "body": "The rehearsal time required for Lachenmann is prohibitive. His notation demands individual coaching for nearly every player \u2014 extended techniques that most of us have never encountered. With our current schedule of 4 rehearsals per programme, we would need to cut one other work entirely or add extra sessions that the budget does not cover. The artistic ambition is admirable but the practical reality makes it irresponsible.",
+        "lineage_desc": "Builds on the parent\u2019s claim that Lachenmann requires heavy rehearsal investment but flips it into a practical objection, arguing that the extreme individual coaching, limited rehearsal slots, and budget constraints make programming him impractical and irresponsible.",
+        "llm_proposed_type": "contradiction",
+        "llm_explanation": "This Branch objects to the parent\u2019s proposal, arguing that rehearsal time, individual coaching needs, and budget constraints make programming Lachenmann impractical and irresponsible. It directly challenges and undermines the parent\u2019s recommendation by raising practical problems and objections, fitting the \u2018contradiction\u2019 category.",
+        "contested": 0
+    },
+    {
+        "id": S4_B3,
+        "space_id": "ensemble-lachenmann",
+        "parent_id": S4_SEED,
+        "node_type": "branch",
+        "branch_type": "reframing",
+        "author": "Tom\u00e1s",
+        "title": "Prioritize audience development before programming Lachenmann",
+        "body": "The question is not whether Lachenmann is artistically worthwhile \u2014 it is whether our audience is ready. Programming Lachenmann is not a musical decision; it is an audience development decision. If we do not invest equally in pre-concert talks, programme notes, and perhaps a workshop where the audience can try the techniques themselves, we risk an empty hall and a board that never approves contemporary music again.",
+        "lineage_desc": "Building on the parent\u2019s case for programming Lachenmann as an identity-defining artistic investment, this reframes the decision as primarily an audience-development problem, arguing that without substantial outreach (pre-concert talks, programme notes, workshops) the piece could fail to draw listeners and provoke board resistance.",
+        "llm_proposed_type": "reframing",
+        "llm_explanation": "The Branch shifts the issue from being primarily a musical/technical choice to being an audience-development decision, insisting success depends on outreach like talks, notes, and workshops. This matches reframing because it offers a fundamentally different interpretive angle on the parent\u2019s proposal without directly opposing the idea of programming Lachenmann.",
+        "contested": 0
+    },
+    {
+        "id": S4_B4,
+        "space_id": "ensemble-lachenmann",
+        "parent_id": S4_B2,
+        "node_type": "branch",
+        "branch_type": "extension",
+        "author": "Yuna",
+        "title": "Introduce Lachenmann via a chamber piece",
+        "body": "Rather than a full orchestral Lachenmann work, we could start with a chamber piece \u2014 perhaps Air or Pression. These require only 1\u20133 players and can be rehearsed independently from the main programme. The audience gets exposed to Lachenmann aesthetics without the full ensemble bearing the rehearsal burden. It is a stepping stone, not a retreat.",
+        "lineage_desc": "Accepting that a full orchestral Lachenmann is impractical because of intensive rehearsal and budget limits, this extension proposes programming a short chamber work (e.g., Air or Pression) for 1\u20133 players so the orchestra can introduce his aesthetics with minimal rehearsal burden as a stepping-stone.",
+        "llm_proposed_type": "extension",
+        "llm_explanation": "The Branch proposes a practical compromise\u2014program a Lachenmann chamber piece with 1\u20133 players to expose audiences while reducing rehearsal burden. This builds on and supports the parent\u2019s concern about rehearsal limits by offering a new constructive option the parent did not anticipate, which fits the definition of an extension.",
+        "contested": 0
+    },
+    {
+        "id": S4_B5,
+        "space_id": "ensemble-lachenmann",
+        "parent_id": S4_B3,
+        "node_type": "branch",
+        "branch_type": "extension",
+        "author": "Dmitri",
+        "title": "Co-produce lecture-recital series with university",
+        "body": "The education angle is exactly right. Our local university has a musicology department that has been looking for partnership opportunities. We could co-produce a lecture-recital series where Lachenmann works are demonstrated, explained, and discussed before the main concert. The university covers the cost of the lectures; we provide the venue and the performers. This turns the audience development problem into a solved one.",
+        "lineage_desc": "Extending the parent\u2019s point that programming Lachenmann demands audience-development measures, this branch proposes a concrete solution\u2014a co-produced lecture-recital series with the university funding the lectures while we supply venue and performers\u2014to operationalize the talks/workshops and effectively solve the audience development problem.",
+        "llm_proposed_type": "extension",
+        "llm_explanation": "The Branch endorses the parent\u2019s audience-development argument and proposes a concrete partnership with the local university to co-produce lecture-recitals, sharing costs and responsibilities to deliver the educational programming. This takes the parent\u2019s recommendation further by adding new, supportive implementation details rather than contradicting or reframing it, so it is an extension.",
+        "contested": 0
+    },
+    {
+        "id": S4_B6,
+        "space_id": "ensemble-lachenmann",
+        "parent_id": S4_SEED,
+        "node_type": "branch",
+        "branch_type": "contradiction",
+        "author": "Aisha",
+        "title": "Prefer accessible contemporary composers over Lachenmann",
+        "body": "I love contemporary music, but Lachenmann is too niche even for new music audiences. His aesthetic is deliberately abrasive \u2014 that is the point. Most concert-goers, even adventurous ones, find sustained periods of bowing on the bridge or playing inside the piano genuinely unpleasant. We should programme living composers who push boundaries without alienating every listener in the room. Think Unsuk Chin or Georg Friedrich Haas \u2014 challenging but not hostile.",
+        "lineage_desc": "Acknowledging the parent\u2019s aim to program challenging contemporary work and build a forward-looking identity, this branch contradicts the specific choice of Lachenmann as too niche and abrasive for many listeners and steers the proposal toward living composers like Unsuk Chin or Georg Friedrich Haas who push boundaries without alienating the audience.",
+        "llm_proposed_type": "contradiction",
+        "llm_explanation": "The Branch objects to programming Lachenmann, arguing his music is overly niche and alienating and proposing alternative composers instead. This raises concerns that undermine the parent\u2019s proposal about audience appeal and feasibility, which matches the \u2018contradiction\u2019 type.",
+        "contested": 0
+    },
+    {
+        "id": S4_B7,
+        "space_id": "ensemble-lachenmann",
+        "parent_id": S4_B2,
+        "node_type": "branch",
+        "branch_type": "contradiction",
+        "author": "Felix",
+        "title": "Not prohibitive: learnable in 2\u20133 sessions",
+        "body": "Reiko overstates the difficulty. I have performed Gran Torso and several of the string quartets. The extended techniques are demanding but learnable in 2\u20133 focused sessions per player. The real challenge is not technical \u2014 it is psychological. Players need to accept that their instrument will sound wrong by classical standards. Once that barrier falls, the notation is precise and logical. We can do this.",
+        "lineage_desc": "The branch takes up the parent\u2019s concern about Lachenmann\u2019s demanding techniques but contradicts the claim that they make the piece impractical, arguing from experience that the techniques are learnable in 2\u20133 focused sessions and reframing the main obstacle as players\u2019 psychological acceptance rather than an insurmountable rehearsal-time or budget problem, thus concluding the work is feasible.",
+        "llm_proposed_type": "contradiction",
+        "llm_explanation": "The Branch disputes the parent\u2019s claim that Lachenmann is prohibitively demanding, arguing the techniques are learnable in a few focused sessions and the true barrier is psychological rather than rehearsal time. This directly challenges and undermines the parent\u2019s conclusion that programming the work would be impractical or irresponsible, matching the \u2018contradiction\u2019 type.",
+        "contested": 0
+    },
+    {
+        "id": S4_B8,
+        "space_id": "ensemble-lachenmann",
+        "parent_id": S4_B1,
+        "node_type": "branch",
+        "branch_type": "extension",
+        "author": "Priya",
+        "title": "Programme as sound-of-listening arc",
+        "body": "The Sciarrino pairing is inspired. I would go further: frame the entire programme as the sound of listening \u2014 open with a short Feldman piece, then Sciarrino, then Lachenmann. Each composer asks the audience to listen differently. The arc from gentle to radical gives people time to adjust. We could even commission programme notes that guide the listener through each shift in listening mode.",
+        "lineage_desc": "Building on the Sciarrino\u2013Lachenmann pairing, this branch expands the idea into a full programme framed as the sound of listening by sequencing a gentle Feldman into Sciarrino then Lachenmann to ease audiences into progressively radical listening modes and proposing guided programme notes to help listeners through each shift.",
+        "llm_proposed_type": "extension",
+        "llm_explanation": "The Branch accepts the Sciarrino\u2013Lachenmann pairing and expands it into a full programme concept (adding a Feldman opener, sequencing pieces to create a listening arc, and commissioning guiding programme notes). Because it builds on and supports the parent\u2019s suggestion by carrying the idea into new territory without challenging or reframing it, it matches the \u2018extension\u2019 type.",
+        "contested": 0
+    },
+    {
+        "id": S4_B9,
+        "space_id": "ensemble-lachenmann",
+        "parent_id": S4_B5,
+        "node_type": "branch",
+        "branch_type": "contradiction",
+        "author": "Leo",
+        "title": "No university dependence \u2014 develop in-house capacity",
+        "body": "The university partnership sounds promising but introduces a dependency we cannot control. What if the musicology department changes priorities? What if the lecture series gets poor attendance and the university pulls out? Our programming decisions should not depend on external institutions. If audience preparation is essential \u2014 and I agree it is \u2014 we should build that capacity in-house, even if it costs more initially.",
+        "lineage_desc": "This branch acknowledges the university lecture-recital proposal as a means of audience preparation but contradicts it by warning that outsourcing creates uncontrollable dependency and therefore argues for building in-house audience-preparation capacity, even at higher initial cost.",
+        "llm_proposed_type": "contradiction",
+        "llm_explanation": "This Branch objects to the proposed university partnership and argues for building audience-preparation capacity in-house, citing risks of dependency and potential withdrawal. It challenges the parent\u2019s proposal by raising concerns that undermine its viability and recommends an alternative approach, which fits the \u2018contradiction\u2019 category.",
+        "contested": 0
+    },
+    {
+        "id": S4_B10,
+        "space_id": "ensemble-lachenmann",
+        "parent_id": S4_B4,
+        "node_type": "branch",
+        "branch_type": "extension",
+        "author": "Sofia",
+        "title": "Two-season plan: chamber then full ensemble",
+        "body": "Starting with a chamber piece is a smart compromise but it should be framed as Phase 1 of a two-season plan. Season one: chamber Lachenmann plus the education programme. Season two, if the reception is positive: a full ensemble work. This gives us data \u2014 ticket sales, audience feedback, player readiness \u2014 before committing to the bigger investment. It also gives the board a clear decision point rather than an open-ended experiment.",
+        "lineage_desc": "Building on the chamber-piece-as-stepping-stone idea, it reframes that start as Phase 1 of a two-season plan\u2014pairing a chamber Lachenmann and education programme in season one to gather ticket, feedback, and player-readiness data and provide the board a clear decision point for a full ensemble work in season two.",
+        "llm_proposed_type": "extension",
+        "llm_explanation": "The Branch takes the parent\u2019s idea of starting with a chamber Lachenmann piece and formalizes it into a two-season plan with Phase 1 being the chamber work plus education and Phase 2 contingent on positive reception. That builds on and supports the parent\u2019s proposal without contradicting it, adding a forward plan and decision point, so it is an extension.",
+        "contested": 0
+    },
+]
+
+
+VOTES = [
+    # Votes on S1_B5 — "Consistent principle: model-bound, non-transferable licenses"
+    {
+        "node_id": S1_B5,
+        "author": "Amara",
+        "position": "support",
+        "justification": "This captures the intent of my original time-limit proposal better than I could."
+    },
+    {
+        "node_id": S1_B5,
+        "author": "Yuki",
+        "position": "support",
+        "justification": "Model-bound licensing makes the 'training run' definition enforceable."
+    },
+    {
+        "node_id": S1_B5,
+        "author": "Fatima",
+        "position": "oppose",
+        "justification": "Framework agreements will still circumvent per-model licensing in practice."
+    },
+
+    # Votes on S3_B5 — "Summary: phased model with stratification"
+    {
+        "node_id": S3_B5,
+        "author": "Nadia",
+        "position": "support",
+        "justification": "The phased approach resolves Kwame's statistical objection while preserving sortition."
+    },
+    {
+        "node_id": S3_B5,
+        "author": "Kwame",
+        "position": "support",
+        "justification": "My concerns about small pools are addressed by the participation threshold."
+    },
+    {
+        "node_id": S3_B5,
+        "author": "Amara",
+        "position": "oppose",
+        "justification": "Letting the first jury define succession rules concentrates too much power in an initial random draw."
+    },
 ]
 
 
@@ -311,3 +531,6 @@ def load():
 
     for node in NODES:
         db.create_node(**node)
+
+    for vote in VOTES:
+        db.create_vote(**vote)

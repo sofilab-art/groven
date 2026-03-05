@@ -379,3 +379,151 @@
         }
     });
 })();
+
+// ============================================================
+// Synthesis Suggestions (space page)
+// ============================================================
+
+(function () {
+    const btn = document.getElementById('suggest-synthesis-btn');
+    if (!btn) return;
+
+    const modal = document.getElementById('synthesis-modal');
+    const modalBody = document.getElementById('synthesis-modal-body');
+    const overlay = document.getElementById('analyzing-overlay');
+    const overlayText = overlay ? overlay.querySelector('p') : null;
+    const form = document.getElementById('contribution-form');
+    const spaceId = form ? form.dataset.spaceId : null;
+
+    if (!modal || !spaceId) return;
+
+    function closeModal() {
+        modal.style.display = 'none';
+    }
+
+    document.getElementById('synthesis-modal-close').addEventListener('click', closeModal);
+    document.getElementById('synthesis-modal-cancel').addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.style.display !== 'none') closeModal();
+    });
+
+    function renderSuggestions(suggestions) {
+        modalBody.innerHTML = '';
+        suggestions.forEach((s, i) => {
+            const card = document.createElement('div');
+            card.className = 'synthesis-card';
+
+            // Refs pills
+            const refNodes = (s.referenced_nodes || []).map(
+                r => `<span class="synthesis-ref-node">${r.author}: ${r.title}</span>`
+            ).join('');
+
+            const parentPill = `<span class="synthesis-ref-node">${s.parent_author}: ${s.parent_title}</span>`;
+
+            card.innerHTML = `
+                <div class="synthesis-card-header">
+                    <span class="synthesis-card-number">${i + 1}</span>
+                    <span class="synthesis-card-title">${s.title}</span>
+                </div>
+                <div class="synthesis-card-refs">
+                    <span class="synthesis-card-refs-label">Connects</span>
+                    ${parentPill}${refNodes}
+                </div>
+                <div class="synthesis-card-body">${s.body}</div>
+                <div class="synthesis-card-reasoning">${s.reasoning}</div>
+                <button class="btn btn-synthesis" data-index="${i}">Use this suggestion</button>
+            `;
+
+            const useBtn = card.querySelector('button');
+            useBtn.addEventListener('click', () => {
+                applySuggestion(s, useBtn);
+            });
+
+            modalBody.appendChild(card);
+        });
+    }
+
+    async function applySuggestion(s, clickedBtn) {
+        // Disable button while saving
+        clickedBtn.disabled = true;
+        clickedBtn.textContent = 'Saving...';
+
+        try {
+            const resp = await fetch('/api/node', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    space_id: spaceId,
+                    author: 'Groven AI',
+                    title: s.title,
+                    body: s.body,
+                    parent_id: s.parent_id,
+                    branch_type: 'synthesis',
+                    llm_proposed_type: 'synthesis',
+                    llm_explanation: s.reasoning,
+                    lineage_desc: s.reasoning,
+                    proposal_summary: s.proposal_summary
+                })
+            });
+
+            if (resp.ok) {
+                closeModal();
+                window.location.reload();
+            } else {
+                const err = await resp.json();
+                alert(err.error || 'Failed to create synthesis node.');
+                clickedBtn.disabled = false;
+                clickedBtn.textContent = 'Use this suggestion';
+            }
+        } catch (err) {
+            console.error('[Synthesis] Save error:', err);
+            alert('Network error. Please try again.');
+            clickedBtn.disabled = false;
+            clickedBtn.textContent = 'Use this suggestion';
+        }
+    }
+
+    btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.textContent = 'Thinking...';
+
+        // Show analyzing overlay with custom text
+        const origText = overlayText ? overlayText.textContent : '';
+        if (overlayText) overlayText.textContent = 'Looking for synthesis opportunities...';
+        if (overlay) overlay.style.display = 'flex';
+
+        try {
+            const resp = await fetch(`/api/space/${spaceId}/suggest-synthesis`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const data = await resp.json();
+
+            if (!resp.ok) {
+                alert(data.error || 'Could not generate suggestions.');
+                return;
+            }
+
+            if (!data.suggestions || data.suggestions.length === 0) {
+                alert('No synthesis opportunities found at this time.');
+                return;
+            }
+
+            renderSuggestions(data.suggestions);
+            modal.style.display = 'flex';
+
+        } catch (err) {
+            console.error('[Synthesis] Error:', err);
+            alert('Network error. Please try again.');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Suggest synthesis';
+            if (overlay) overlay.style.display = 'none';
+            if (overlayText) overlayText.textContent = origText;
+        }
+    });
+})();

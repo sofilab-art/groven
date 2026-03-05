@@ -39,15 +39,20 @@ def init_db():
             llm_proposed_type TEXT,
             llm_explanation   TEXT,
             contested         BOOLEAN DEFAULT 0,
+            proposal_summary  TEXT,
             created_at        DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
+        DROP TABLE IF EXISTS votes;
+
         CREATE TABLE IF NOT EXISTS votes (
-            id          TEXT PRIMARY KEY,
-            space_id    TEXT NOT NULL REFERENCES spaces(id),
-            author      TEXT NOT NULL,
-            choice      TEXT NOT NULL,
-            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+            id            TEXT PRIMARY KEY,
+            node_id       TEXT NOT NULL REFERENCES nodes(id),
+            author        TEXT NOT NULL,
+            position      TEXT NOT NULL,
+            justification TEXT NOT NULL,
+            created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(node_id, author)
         );
     """)
     conn.commit()
@@ -140,18 +145,21 @@ def get_node_ancestors(node_id):
 
 def create_node(space_id, author, body, parent_id=None, node_type="seed",
                 branch_type=None, title=None, lineage_desc=None,
-                llm_proposed_type=None, llm_explanation=None, contested=0, id=None):
+                llm_proposed_type=None, llm_explanation=None, contested=0, id=None,
+                proposal_summary=None):
     """Create a new node and return its id."""
     node_id = id or str(uuid.uuid4())
     conn = get_db()
     conn.execute("""
         INSERT INTO nodes (id, space_id, parent_id, node_type, branch_type,
                            author, title, body, lineage_desc,
-                           llm_proposed_type, llm_explanation, contested)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                           llm_proposed_type, llm_explanation, contested,
+                           proposal_summary)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (node_id, space_id, parent_id, node_type, branch_type,
           author, title, body, lineage_desc,
-          llm_proposed_type, llm_explanation, contested))
+          llm_proposed_type, llm_explanation, contested,
+          proposal_summary))
     conn.commit()
     conn.close()
     return node_id
@@ -163,7 +171,8 @@ def get_tree(space_id):
     rows = conn.execute("""
         SELECT id, space_id, parent_id, node_type, branch_type,
                author, title, body, lineage_desc,
-               llm_proposed_type, llm_explanation, contested, created_at
+               llm_proposed_type, llm_explanation, contested,
+               proposal_summary, created_at
         FROM nodes
         WHERE space_id = ?
         ORDER BY created_at ASC
@@ -178,3 +187,49 @@ def spaces_empty():
     row = conn.execute("SELECT COUNT(*) as cnt FROM spaces").fetchone()
     conn.close()
     return row["cnt"] == 0
+
+
+# --- Votes ---
+
+def create_vote(node_id, author, position, justification):
+    """Create or update a vote. Returns the vote id."""
+    vote_id = str(uuid.uuid4())
+    conn = get_db()
+    conn.execute("""
+        INSERT INTO votes (id, node_id, author, position, justification)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(node_id, author) DO UPDATE SET
+            position = excluded.position,
+            justification = excluded.justification,
+            created_at = CURRENT_TIMESTAMP
+    """, (vote_id, node_id, author, position, justification))
+    conn.commit()
+    conn.close()
+    return vote_id
+
+
+def get_votes_for_node(node_id):
+    """Return all votes for a node, ordered by creation time."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM votes WHERE node_id = ? ORDER BY created_at ASC",
+        (node_id,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_vote_tallies(space_id):
+    """Return vote tallies for all synthesis nodes in a space."""
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT v.node_id,
+               SUM(CASE WHEN v.position = 'support' THEN 1 ELSE 0 END) as support,
+               SUM(CASE WHEN v.position = 'oppose' THEN 1 ELSE 0 END) as oppose
+        FROM votes v
+        JOIN nodes n ON n.id = v.node_id
+        WHERE n.space_id = ? AND n.branch_type = 'synthesis'
+        GROUP BY v.node_id
+    """, (space_id,)).fetchall()
+    conn.close()
+    return {r["node_id"]: {"support": r["support"], "oppose": r["oppose"]} for r in rows}

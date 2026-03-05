@@ -49,8 +49,9 @@ def node_view(node_id):
     space = db.get_space(node["space_id"])
     ancestors = db.get_node_ancestors(node_id)
     children = db.get_node_children(node_id)
+    votes = db.get_votes_for_node(node_id) if node["branch_type"] == "synthesis" else []
     return render_template("node.html", node=node, space=space,
-                           ancestors=ancestors, children=children)
+                           ancestors=ancestors, children=children, votes=votes)
 
 
 # ============================================================
@@ -164,6 +165,8 @@ def api_create_node():
     else:
         node_type = "seed"
 
+    proposal_summary = (data.get("proposal_summary") or "").strip() or None
+
     node_id = db.create_node(
         space_id=space_id,
         author=author,
@@ -175,7 +178,8 @@ def api_create_node():
         lineage_desc=lineage_desc,
         llm_proposed_type=llm_proposed_type,
         llm_explanation=llm_explanation,
-        contested=contested
+        contested=contested,
+        proposal_summary=proposal_summary
     )
 
     return jsonify({
@@ -311,13 +315,93 @@ def api_tree(space_id):
     if not db.get_space(space_id):
         return jsonify({"error": "Space not found"}), 404
     nodes = db.get_tree(space_id)
+    tallies = db.get_vote_tallies(space_id)
+    for node in nodes:
+        if node["id"] in tallies:
+            node["vote_support"] = tallies[node["id"]]["support"]
+            node["vote_oppose"] = tallies[node["id"]]["oppose"]
     return jsonify(nodes)
+
+
+@app.route("/api/space/<space_id>/suggest-synthesis", methods=["POST"])
+def api_suggest_synthesis(space_id):
+    """Ask the LLM to suggest synthesis opportunities for a space."""
+    space = db.get_space(space_id)
+    if not space:
+        return jsonify({"error": "Space not found"}), 404
+
+    nodes = db.get_tree(space_id)
+    if len(nodes) < 3:
+        return jsonify({"error": "Need at least 3 contributions before suggesting syntheses"}), 400
+
+    suggestions = llm.suggest_synthesis(space["title"], nodes)
+    if suggestions is None:
+        return jsonify({"error": "LLM unavailable. Please try again."}), 503
+
+    # Enrich suggestions with node titles for display
+    node_map = {n["id"]: n for n in nodes}
+    enriched = []
+    for s in suggestions:
+        parent = node_map.get(s["parent_id"])
+        refs = [node_map.get(rid) for rid in s.get("referenced_ids", []) if node_map.get(rid)]
+
+        # Generate a one-sentence proposal summary
+        summary = llm.generate_proposal_summary(s["body"])
+
+        enriched.append({
+            "parent_id": s["parent_id"],
+            "parent_title": parent["title"] if parent else "Unknown",
+            "parent_author": parent["author"] if parent else "Unknown",
+            "referenced_ids": s.get("referenced_ids", []),
+            "referenced_nodes": [
+                {"id": r["id"], "title": r["title"], "author": r["author"]}
+                for r in refs
+            ],
+            "title": s["title"],
+            "body": s["body"],
+            "reasoning": s["reasoning"],
+            "proposal_summary": summary
+        })
+
+    return jsonify({"suggestions": enriched})
 
 
 @app.route("/api/vote", methods=["POST"])
 def api_vote():
-    """Cast a vote (placeholder)."""
-    return jsonify({"status": "not implemented"}), 501
+    """Cast a Support/Oppose vote on a synthesis node."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON body"}), 400
+
+    node_id = (data.get("node_id") or "").strip()
+    author = (data.get("author") or "").strip()
+    position = (data.get("position") or "").strip()
+    justification = (data.get("justification") or "").strip()
+
+    if not node_id or not author or not position or not justification:
+        return jsonify({"error": "node_id, author, position, and justification are required"}), 400
+
+    if position not in ("support", "oppose"):
+        return jsonify({"error": "position must be 'support' or 'oppose'"}), 400
+
+    node = db.get_node(node_id)
+    if not node:
+        return jsonify({"error": "Node not found"}), 404
+    if node["branch_type"] != "synthesis":
+        return jsonify({"error": "Only synthesis nodes (proposals) can be voted on"}), 400
+
+    vote_id = db.create_vote(node_id, author, position, justification)
+    return jsonify({"id": vote_id, "position": position, "justification": justification}), 201
+
+
+@app.route("/api/votes/<node_id>")
+def api_get_votes(node_id):
+    """Return all votes for a node."""
+    node = db.get_node(node_id)
+    if not node:
+        return jsonify({"error": "Node not found"}), 404
+    votes = db.get_votes_for_node(node_id)
+    return jsonify(votes)
 
 
 # ============================================================
@@ -330,6 +414,7 @@ def admin_seed():
     # Drop existing data
     import sqlite3
     conn = db.get_db()
+    conn.execute("DELETE FROM votes")
     conn.execute("DELETE FROM nodes")
     conn.execute("DELETE FROM spaces")
     conn.commit()

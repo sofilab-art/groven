@@ -106,6 +106,16 @@
                     .on('drag', dragged)
                     .on('end', dragended));
 
+            // Proposal halo ring (synthesis nodes)
+            nodeGroup.filter(d => d.branch_type === 'synthesis')
+                .insert('circle', ':first-child')
+                .attr('r', 17)
+                .attr('fill', 'none')
+                .attr('stroke', '#8B5CF6')
+                .attr('stroke-width', 2)
+                .attr('stroke-opacity', 0.35)
+                .attr('stroke-dasharray', '3,2');
+
             // Node circles
             nodeGroup.append('circle')
                 .attr('r', d => d.node_type === 'seed' ? 18 : 12)
@@ -158,6 +168,9 @@
                     const titleHtml = d.title
                         ? `<div class="tt-title">${d.title}</div>`
                         : '';
+                    const tallyHtml = (d.vote_support || d.vote_oppose)
+                        ? `<div class="vote-tally">${d.vote_support || 0} Support &middot; ${d.vote_oppose || 0} Oppose</div>`
+                        : '';
 
                     tooltip
                         .style('display', 'block')
@@ -166,6 +179,7 @@
                             <span class="tt-type type-badge type-${typeLabel}">${typeLabel}</span>
                             ${titleHtml}
                             <div class="tt-body">${d.body}</div>
+                            ${tallyHtml}
                         `);
                 })
                 .on('mousemove', (event) => {
@@ -248,7 +262,7 @@
             if (node.contested) {
                 llmHtml = `
                     <details class="llm-info-box llm-info-contested">
-                        <summary class="llm-label">LLM Analysis</summary>
+                        <summary class="lineage-label">Classification Reasoning</summary>
                         <p class="contested-info">
                             LLM proposed <span class="type-badge type-${node.llm_proposed_type}">${node.llm_proposed_type}</span>
                             — author chose <span class="type-badge type-${node.branch_type}">${node.branch_type}</span>
@@ -258,12 +272,32 @@
             } else {
                 llmHtml = `
                     <details class="llm-info-box">
-                        <summary class="llm-label">LLM Analysis</summary>
+                        <summary class="lineage-label">Classification Reasoning</summary>
                         <p>Type: <span class="type-badge type-${node.llm_proposed_type}">${node.llm_proposed_type}</span> (confirmed)</p>
                         ${node.llm_explanation ? `<p class="llm-explanation">${node.llm_explanation}</p>` : ''}
                     </details>`;
             }
         }
+
+        const tallyHtml = (node.vote_support || node.vote_oppose)
+            ? `<div class="vote-tally" style="margin-top:0.3rem;">${node.vote_support || 0} Support &middot; ${node.vote_oppose || 0} Oppose</div>`
+            : '';
+
+        const proposalText = node.proposal_summary || (node.body.length > 200 ? node.body.slice(0, 200) + '...' : node.body);
+        const voteFormHtml = node.branch_type === 'synthesis' ? `
+            <div class="proposal-section" style="margin-top:0.75rem;" id="panel-vote-section" data-node-id="${node.id}">
+                <div class="proposal-banner">Proposal — take a position</div>
+                <blockquote class="proposal-quote">${proposalText}</blockquote>
+                <div class="vote-buttons">
+                    <button type="button" class="vote-btn vote-btn-support panel-vote-btn" data-position="support">Support</button>
+                    <button type="button" class="vote-btn vote-btn-oppose panel-vote-btn" data-position="oppose">Oppose</button>
+                </div>
+                <div class="vote-form-fields" id="panel-vote-fields" style="display:none;">
+                    <input type="text" id="panel-vote-author" placeholder="Your name" class="vote-author-input">
+                    <textarea id="panel-vote-justification" rows="2" placeholder="One sentence: why?"></textarea>
+                    <button type="button" id="panel-vote-submit" class="btn btn-primary">Submit</button>
+                </div>
+            </div>` : '';
 
         content.innerHTML = `
             <div class="node-header-badges">
@@ -274,6 +308,7 @@
             <div class="node-meta" style="margin-bottom:0.75rem;">
                 <span>by <strong>${node.author}</strong></span>
             </div>
+            ${tallyHtml}
             <div class="node-body" style="font-size:0.95rem;line-height:1.65;">${node.body}</div>
             ${node.lineage_desc ? `
                 <details class="lineage-box" style="margin-top:0.75rem;">
@@ -281,12 +316,73 @@
                     <em>${node.lineage_desc}</em>
                 </details>` : ''}
             ${llmHtml}
+            ${voteFormHtml}
             <div style="margin-top:0.75rem;">
                 <a href="/node/${node.id}" class="btn btn-secondary" style="text-align:center;display:block;">
                     View details &rarr;
                 </a>
             </div>
         `;
+
+        // Wire up inline voting if synthesis
+        if (node.branch_type === 'synthesis') {
+            let selectedPos = null;
+            const btns = content.querySelectorAll('.panel-vote-btn');
+            const fields = document.getElementById('panel-vote-fields');
+            const submitBtn = document.getElementById('panel-vote-submit');
+
+            btns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    btns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    selectedPos = btn.dataset.position;
+                    if (fields) fields.style.display = 'block';
+                });
+            });
+
+            if (submitBtn) {
+                submitBtn.addEventListener('click', async () => {
+                    const author = document.getElementById('panel-vote-author').value.trim();
+                    const justification = document.getElementById('panel-vote-justification').value.trim();
+                    if (!selectedPos || !author || !justification) {
+                        alert('Select a position, enter your name, and provide a justification.');
+                        return;
+                    }
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Submitting...';
+                    try {
+                        const res = await fetch('/api/vote', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                node_id: node.id,
+                                author: author,
+                                position: selectedPos,
+                                justification: justification
+                            })
+                        });
+                        if (res.ok) {
+                            // Update tallies locally
+                            if (selectedPos === 'support') {
+                                node.vote_support = (node.vote_support || 0) + 1;
+                            } else {
+                                node.vote_oppose = (node.vote_oppose || 0) + 1;
+                            }
+                            showNodeDetail(node);
+                        } else {
+                            const err = await res.json();
+                            alert(err.error || 'Failed to submit vote');
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Submit';
+                        }
+                    } catch (e) {
+                        alert('Network error');
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Submit';
+                    }
+                });
+            }
+        }
 
         panel.style.display = 'block';
     }

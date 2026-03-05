@@ -55,7 +55,7 @@
         <!-- LLM Box -->
         {% if node.llm_proposed_type %}
         <details class="llm-info-box {% if node.contested %}llm-info-contested{% endif %}" open>
-            <summary class="llm-label">LLM Analysis</summary>
+            <summary class="lineage-label">Classification Reasoning</summary>
             {% if node.contested %}
             <p class="contested-info">
                 LLM proposed <span class="type-badge type-{{ node.llm_proposed_type }}">{{ node.llm_proposed_type }}</span>
@@ -68,6 +68,99 @@
             <p class="llm-explanation">{{ node.llm_explanation }}</p>
             {% endif %}
         </details>
+        {% endif %}
+
+        <!-- Proposal voting (synthesis nodes only) -->
+        {% if node.branch_type == 'synthesis' %}
+        <div class="proposal-section" id="proposal-section" data-node-id="{{ node.id }}">
+            <div class="proposal-banner">Proposal — take a position</div>
+            <blockquote class="proposal-quote">{{ node.proposal_summary or node.body }}</blockquote>
+
+            <div class="vote-form">
+                <div class="vote-buttons">
+                    <button type="button" class="vote-btn vote-btn-support" data-position="support">Support</button>
+                    <button type="button" class="vote-btn vote-btn-oppose" data-position="oppose">Oppose</button>
+                </div>
+                <div class="vote-form-fields" style="display:none;">
+                    <input type="text" id="vote-author" placeholder="Your name" class="vote-author-input">
+                    <textarea id="vote-justification" rows="2" placeholder="One sentence: why do you take this position?"></textarea>
+                    <button type="button" id="vote-submit" class="btn btn-primary">Submit vote</button>
+                </div>
+            </div>
+
+            {% if votes %}
+            <div class="vote-list">
+                <h3>Positions taken ({{ votes|length }})</h3>
+                {% for vote in votes %}
+                <div class="vote-item vote-item-{{ vote.position }}">
+                    <div class="vote-item-header">
+                        <span class="vote-author">{{ vote.author }}</span>
+                        <span class="vote-position-badge vote-position-{{ vote.position }}">{{ vote.position }}</span>
+                    </div>
+                    <p class="vote-justification-text">{{ vote.justification }}</p>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <script>
+        (function() {
+            const section = document.getElementById('proposal-section');
+            if (!section) return;
+            const nodeId = section.dataset.nodeId;
+            const buttons = section.querySelectorAll('.vote-btn');
+            const fields = section.querySelector('.vote-form-fields');
+            const authorInput = document.getElementById('vote-author');
+            const justInput = document.getElementById('vote-justification');
+            const submitBtn = document.getElementById('vote-submit');
+            let selectedPosition = null;
+
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    buttons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    selectedPosition = btn.dataset.position;
+                    fields.style.display = 'block';
+                });
+            });
+
+            submitBtn.addEventListener('click', async () => {
+                const author = authorInput.value.trim();
+                const justification = justInput.value.trim();
+                if (!selectedPosition || !author || !justification) {
+                    alert('Please select a position, enter your name, and provide a justification.');
+                    return;
+                }
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Submitting...';
+                try {
+                    const res = await fetch('/api/vote', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            node_id: nodeId,
+                            author: author,
+                            position: selectedPosition,
+                            justification: justification
+                        })
+                    });
+                    if (res.ok) {
+                        location.reload();
+                    } else {
+                        const err = await res.json();
+                        alert(err.error || 'Failed to submit vote');
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Submit vote';
+                    }
+                } catch (e) {
+                    alert('Network error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit vote';
+                }
+            });
+        })();
+        </script>
         {% endif %}
 
         <!-- Children -->
