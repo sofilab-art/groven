@@ -24,7 +24,7 @@
         <header class="node-header">
             <div class="node-header-badges">
                 {% if node.branch_type %}
-                <span class="type-badge type-{{ node.branch_type }}">{{ node.branch_type }}</span>
+                <span class="type-badge type-{{ node.branch_type }}">{{ node.branch_type }}{% if node.is_question %}?{% endif %}</span>
                 {% else %}
                 <span class="type-badge type-seed">Seed</span>
                 {% endif %}
@@ -173,7 +173,7 @@
                     <div class="node-list-header">
                         <span class="node-author">{{ child.author }}</span>
                         {% if child.branch_type %}
-                        <span class="type-badge type-{{ child.branch_type }}">{{ child.branch_type }}</span>
+                        <span class="type-badge type-{{ child.branch_type }}">{{ child.branch_type }}{% if child.is_question %}?{% endif %}</span>
                         {% endif %}
                         {% if child.contested %}
                         <span class="contested-badge">Contested</span>

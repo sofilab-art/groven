@@ -123,6 +123,7 @@ def api_create_node():
     llm_explanation = None
     lineage_desc = None
     contested = 0
+    is_question = 0
 
     if parent_id:
         node_type = "branch"
@@ -143,6 +144,7 @@ def api_create_node():
             llm_explanation = reviewed_llm_explanation
             lineage_desc = reviewed_lineage
             contested = 1 if (reviewed_llm_proposed and branch_type != llm_proposed_type) else 0
+            is_question = 1 if data.get("is_question") else 0
         else:
             # Fallback: auto-classify (for direct API calls without modal)
             proposal = llm.propose_branch_type(
@@ -154,6 +156,7 @@ def api_create_node():
                 branch_type = proposal["proposed_type"]
                 llm_proposed_type = proposal["proposed_type"]
                 llm_explanation = proposal.get("explanation")
+                is_question = 1 if proposal.get("is_question") else 0
             else:
                 branch_type = "extension"
                 llm_proposed_type = None
@@ -180,14 +183,16 @@ def api_create_node():
         llm_proposed_type=llm_proposed_type,
         llm_explanation=llm_explanation,
         contested=contested,
-        proposal_summary=proposal_summary
+        proposal_summary=proposal_summary,
+        is_question=is_question
     )
 
     return jsonify({
         "id": node_id,
         "node_type": node_type,
         "branch_type": branch_type,
-        "contested": contested
+        "contested": contested,
+        "is_question": bool(is_question)
     }), 201
 
 
@@ -217,10 +222,12 @@ def api_preview_node():
     proposed_type = None
     confidence = None
     explanation = None
+    is_question = False
     if proposal:
         proposed_type = proposal["proposed_type"]
         confidence = proposal.get("confidence")
         explanation = proposal.get("explanation")
+        is_question = proposal.get("is_question", False)
 
     lineage_desc = llm.generate_lineage(
         parent_body=parent_node["body"],
@@ -236,6 +243,7 @@ def api_preview_node():
 
     return jsonify({
         "proposed_type": proposed_type,
+        "is_question": is_question,
         "confidence": confidence,
         "explanation": explanation,
         "lineage_desc": lineage_desc,
@@ -274,12 +282,14 @@ def api_reclassify_node():
     if result:
         return jsonify({
             "explanation": result.get("explanation", ""),
+            "is_question": result.get("is_question", False),
             "lineage_desc": result.get("lineage_desc", ""),
             "suggested_title": result.get("suggested_title", "")
         })
     else:
         return jsonify({
             "explanation": "",
+            "is_question": False,
             "lineage_desc": "",
             "suggested_title": ""
         })

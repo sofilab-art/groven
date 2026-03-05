@@ -24,10 +24,17 @@ The five Branch types are:
 - contradiction: challenges, objects to, or undermines the parent's proposal; this includes raising concerns, objections, or practical problems that call the parent's viability into question, even if the objection introduces new considerations
 - synthesis: connects two or more existing lines of thought; reconciles divergent Branches
 
+Additionally, determine whether the Branch is asking a question rather than making
+a statement. A question *requests* information, clarification, or justification
+from the parent — it does not itself provide an answer. Classify the underlying
+type (e.g., a question requesting clarification is type "clarification") AND set
+is_question to true. If the Branch makes a statement, set is_question to false.
+
 Respond ONLY with valid JSON. No preamble, no explanation outside the JSON.
 
 {
   "proposed_type": "<one of the five types>",
+  "is_question": <true|false>,
   "confidence": <0.0–1.0>,
   "explanation": "<exactly two sentences: first sentence states what the Branch does; second sentence states why that matches the proposed type>"
 }"""
@@ -89,6 +96,7 @@ def propose_branch_type(parent_body, branch_body, lineage_desc):
 
         return {
             "proposed_type": result["proposed_type"],
+            "is_question": bool(result.get("is_question", False)),
             "confidence": float(result.get("confidence", 0.0)),
             "explanation": result.get("explanation", "")
         }
@@ -256,9 +264,15 @@ The five Branch types are:
 - contradiction: challenges, objects to, or undermines the parent's proposal; includes raising concerns or practical problems
 - synthesis: connects two or more existing lines of thought; reconciles divergent Branches
 
+Additionally, determine whether the Branch is asking a question rather than making
+a statement. A question *requests* information, clarification, or justification
+from the parent — it does not itself provide an answer. Set is_question to true
+if the Branch is primarily a question; false if it makes a statement.
+
 Respond ONLY with valid JSON:
 {
-  "explanation": "<exactly three sentences: first sentence briefly states the original classification and why it was proposed; second sentence states that the author chose a different type; third sentence explains why the author's reading is reasonable and how the contribution should be interpreted under that type>"
+  "explanation": "<exactly three sentences: first sentence briefly states the original classification and why it was proposed; second sentence states that the author chose a different type; third sentence explains why the author's reading is reasonable and how the contribution should be interpreted under that type>",
+  "is_question": <true|false>
 }"""
 
 RECLASSIFY_USER_TEMPLATE = """Parent node:

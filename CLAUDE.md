@@ -15,11 +15,15 @@ one parent). Branches have a semantic type: clarification | extension | reframin
 contradiction | synthesis. The LLM proposes a type; the author confirms or overrides.
 If they differ, the node is marked as "contested".
 
+Branches can also be questions — a boolean modifier (is_question) orthogonal to the
+five types. The LLM detects questions automatically; the author can toggle. Question
+nodes keep their type color but show a ? marker in graph and badges.
+
 ## Data model
 spaces: id (slug), title, description, status (open|ready|decided)
 nodes: id (UUID), space_id, parent_id (NULL=Seed), node_type, branch_type,
        author, title, body, lineage_desc, llm_proposed_type, llm_explanation,
-       contested (bool), created_at
+       contested (bool), is_question (bool), proposal_summary, created_at
 
 ## File structure
 main.py, db.py, llm.py, seed_data.py

@@ -8,6 +8,8 @@ Groven tests a core hypothesis: does typing contributions (clarification, extens
 
 Every contribution is either a **Seed** (a root argument) or a **Branch** (a response to an existing node). Branches carry a semantic type — proposed by an LLM, confirmed or overridden by the author. When the author disagrees with the LLM's classification, the node is marked as **contested**, making disagreement visible in the graph.
 
+Branches can also be flagged as **questions** — a modifier orthogonal to the five types. "What do you mean by X?" is *requesting* clarification, not *providing* it. The LLM detects questions automatically; the author can toggle the flag. Question nodes keep their type color but display a **?** marker in the graph and badges, signalling an unresolved thread that needs attention.
+
 Once enough threads diverge, the LLM can **suggest synthesis nodes** — concrete proposals that connect different lines of argument. Synthesis nodes are votable: participants take a position (Support / Oppose) with a one-sentence justification.
 
 ## What this prototype is for
@@ -62,15 +64,16 @@ Open http://localhost:5000. Seed data loads automatically on first start.
 - **Spaces** — deliberation topics (open / ready / decided)
 - **Nodes** — contributions: Seeds (root) or Branches (with parent)
 - **Branch types** — clarification | extension | reframing | contradiction | synthesis
+- **Question flag** — boolean modifier on any branch type (`is_question`)
 
 ### Contribution flow
 
 1. Author writes a branch contribution (body text only)
-2. LLM proposes a branch type, generates a title, lineage description, and two-sentence explanation
-3. Author reviews everything in a modal — can edit title and lineage, and confirm or override the type
+2. LLM proposes a branch type, detects whether it's a question, generates a title, lineage description, and two-sentence explanation
+3. Author reviews everything in a modal — can edit title and lineage, confirm or override the type, and toggle the "This is a question" checkbox
 4. If the author picks a different type, the LLM rethinks and explains why the author's reading is reasonable
 5. If overridden, the node is flagged as **contested**
-6. The graph updates — contested nodes have a dashed border
+6. The graph updates — contested nodes have a dashed border, question nodes show a **?** overlay
 
 ### Synthesis suggestions
 
@@ -82,7 +85,7 @@ Synthesis nodes are proposals. Participants can **Support** or **Oppose** with a
 
 ### Visualization
 
-D3.js force-directed graph. Node color = branch type. Node size distinguishes seeds from branches. Synthesis nodes have a dashed purple halo. Contested nodes have dashed amber borders. Click a node for inline detail and voting; hover for tooltip.
+D3.js force-directed graph. Node color = branch type. Node size distinguishes seeds from branches. Synthesis nodes have a dashed purple halo. Contested nodes have dashed amber borders. Question nodes display a white **?** on the circle. Click a node for inline detail and voting; hover for tooltip. Type badges append **?** for questions (e.g. "clarification?").
 
 ## What this prototype does NOT include
 

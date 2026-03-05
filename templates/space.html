@@ -91,7 +91,7 @@
                         <div class="node-list-header">
                             <span class="node-author">{{ node.author }}</span>
                             {% if node.branch_type %}
-                            <span class="type-badge type-{{ node.branch_type }}">{{ node.branch_type }}</span>
+                            <span class="type-badge type-{{ node.branch_type }}">{{ node.branch_type }}{% if node.is_question %}?{% endif %}</span>
                             {% else %}
                             <span class="type-badge type-seed">Seed</span>
                             {% endif %}
@@ -172,6 +172,12 @@
                     </label>
                 </div>
             </div>
+
+            <label class="question-flag">
+                <input type="checkbox" id="review-is-question">
+                <span class="question-flag-label">This is a question</span>
+                <span class="question-flag-hint">Questions request information or clarification — they signal an unresolved thread</span>
+            </label>
         </div>
 
         <div class="review-modal-footer">

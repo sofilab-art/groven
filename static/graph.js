@@ -127,6 +127,17 @@
                 .attr('stroke-width', d => d.contested ? 2.5 : 1)
                 .attr('stroke-dasharray', d => d.contested ? '4,3' : 'none');
 
+            // Question marker overlay (? on question nodes)
+            nodeGroup.filter(d => d.is_question)
+                .append('text')
+                .attr('text-anchor', 'middle')
+                .attr('dominant-baseline', 'central')
+                .attr('font-size', d => d.node_type === 'seed' ? '16px' : '12px')
+                .attr('font-weight', '700')
+                .attr('fill', '#FFFFFF')
+                .attr('pointer-events', 'none')
+                .text('?');
+
             // Title labels (wrap to 2 lines)
             nodeGroup.each(function (d) {
                 const label = d.title || d.author;
@@ -165,6 +176,7 @@
             nodeGroup
                 .on('mouseenter', (event, d) => {
                     const typeLabel = d.branch_type || 'seed';
+                    const questionSuffix = d.is_question ? '?' : '';
                     const titleHtml = d.title
                         ? `<div class="tt-title">${d.title}</div>`
                         : '';
@@ -176,7 +188,7 @@
                         .style('display', 'block')
                         .html(`
                             <span class="tt-author">${d.author}</span>
-                            <span class="tt-type type-badge type-${typeLabel}">${typeLabel}</span>
+                            <span class="tt-type type-badge type-${typeLabel}">${typeLabel}${questionSuffix}</span>
                             ${titleHtml}
                             <div class="tt-body">${d.body}</div>
                             ${tallyHtml}
@@ -253,6 +265,7 @@
         if (!panel || !content) return;
 
         const typeLabel = node.branch_type || 'seed';
+        const questionSuffix = node.is_question ? '?' : '';
         const contested = node.contested
             ? '<span class="contested-badge">Contested</span>'
             : '';
@@ -301,7 +314,7 @@
 
         content.innerHTML = `
             <div class="node-header-badges">
-                <span class="type-badge type-${typeLabel}">${typeLabel}</span>
+                <span class="type-badge type-${typeLabel}">${typeLabel}${questionSuffix}</span>
                 ${contested}
             </div>
             <h3 style="margin:0.5rem 0;color:#1B4332;">${node.title || 'Contribution by ' + node.author}</h3>

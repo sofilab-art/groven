@@ -627,6 +627,51 @@ a:hover {
 .type-contradiction { background: var(--type-contradiction); }
 .type-synthesis { background: var(--type-synthesis); }
 
+/* ============================================================
+   Question Flag (review modal checkbox)
+   ============================================================ */
+
+.question-flag {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: 8px;
+    background: rgba(59, 130, 246, 0.05);
+    border: 1.5px solid rgba(59, 130, 246, 0.15);
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.question-flag:hover {
+    background: rgba(59, 130, 246, 0.08);
+    border-color: rgba(59, 130, 246, 0.25);
+}
+
+.question-flag:has(input:checked) {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: var(--type-clarification);
+}
+
+.question-flag input[type="checkbox"] {
+    margin-top: 0.15rem;
+    accent-color: var(--type-clarification);
+}
+
+.question-flag-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--forest);
+}
+
+.question-flag-hint {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--leaf);
+}
+
 /* Spinner */
 
 .spinner {

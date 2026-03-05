@@ -113,6 +113,12 @@
             const radios = modal.querySelectorAll('input[name="review_branch_type"]');
             radios.forEach(r => { r.checked = (r.value === proposedType); });
 
+            // Set question checkbox
+            const questionCheckbox = document.getElementById('review-is-question');
+            if (questionCheckbox) {
+                questionCheckbox.checked = !!preview.is_question;
+            }
+
             // Store data for confirm handler
             modal._payload = payload;
             modal._preview = preview;
@@ -236,6 +242,12 @@
 
                     const data = await resp.json();
                     if (data.explanation) explanationEl.textContent = data.explanation;
+
+                    // Update question checkbox if reclassify returns is_question
+                    if (data.is_question !== undefined) {
+                        const qCb = document.getElementById('review-is-question');
+                        if (qCb) qCb.checked = !!data.is_question;
+                    }
                 } catch (err) {
                     if (err.name !== 'AbortError') {
                         console.error('[Reclassify] Error:', err);
@@ -259,6 +271,9 @@
             payload.lineage_desc = document.getElementById('review-lineage').value.trim();
             payload.llm_proposed_type = preview.proposed_type;
             payload.llm_explanation = preview.explanation;
+
+            const questionCheckbox = document.getElementById('review-is-question');
+            payload.is_question = questionCheckbox ? questionCheckbox.checked : false;
 
             closeModal();
             submitBtn.disabled = true;

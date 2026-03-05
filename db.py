@@ -39,6 +39,7 @@ def init_db():
             llm_proposed_type TEXT,
             llm_explanation   TEXT,
             contested         BOOLEAN DEFAULT 0,
+            is_question       BOOLEAN DEFAULT 0,
             proposal_summary  TEXT,
             created_at        DATETIME DEFAULT CURRENT_TIMESTAMP
         );
@@ -146,7 +147,7 @@ def get_node_ancestors(node_id):
 def create_node(space_id, author, body, parent_id=None, node_type="seed",
                 branch_type=None, title=None, lineage_desc=None,
                 llm_proposed_type=None, llm_explanation=None, contested=0, id=None,
-                proposal_summary=None):
+                proposal_summary=None, is_question=0):
     """Create a new node and return its id."""
     node_id = id or str(uuid.uuid4())
     conn = get_db()
@@ -154,12 +155,12 @@ def create_node(space_id, author, body, parent_id=None, node_type="seed",
         INSERT INTO nodes (id, space_id, parent_id, node_type, branch_type,
                            author, title, body, lineage_desc,
                            llm_proposed_type, llm_explanation, contested,
-                           proposal_summary)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                           is_question, proposal_summary)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (node_id, space_id, parent_id, node_type, branch_type,
           author, title, body, lineage_desc,
           llm_proposed_type, llm_explanation, contested,
-          proposal_summary))
+          is_question, proposal_summary))
     conn.commit()
     conn.close()
     return node_id
@@ -172,7 +173,7 @@ def get_tree(space_id):
         SELECT id, space_id, parent_id, node_type, branch_type,
                author, title, body, lineage_desc,
                llm_proposed_type, llm_explanation, contested,
-               proposal_summary, created_at
+               is_question, proposal_summary, created_at
         FROM nodes
         WHERE space_id = ?
         ORDER BY created_at ASC

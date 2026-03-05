@@ -57,18 +57,39 @@ The concept paper should consider whether to formalise this distinction.
 **Partially covered.** Section 2.2 describes the Branch creation requirement (lineage description) and Section 2.5 describes the LLM's role. The prototype reveals the full UX flow, which has implications worth documenting:
 
 1. Author writes only the body text (no title, no type selection, no lineage).
-2. The LLM reads parent + body and returns: proposed type, generated title, lineage description, and a two-sentence explanation.
-3. The author reviews everything in a modal. They can edit the title and lineage description, and confirm or override the type.
-4. If the author picks a different type, the LLM is called again to *rethink* — it generates a new explanation acknowledging why the author's reading is reasonable.
-5. If overridden, the node is flagged as Contested.
+2. The LLM reads parent + body and returns: proposed type, whether it's a question, generated title, lineage description, and a two-sentence explanation.
+3. The author reviews everything in a modal. They can edit the title and lineage description, confirm or override the type, and toggle the "This is a question" checkbox.
+4. If the author picks a different type, the LLM is called again to *rethink* — it generates a new explanation acknowledging why the author's reading is reasonable, and reconsiders whether the contribution is a question.
+5. If overridden, the node is flagged as Contested. Question nodes display a `?` marker in the graph and on type badges.
 
-**Key observation:** The author writes *less* than the concept paper assumes (no title, no lineage, no type), and the LLM proposes *more* (title, lineage, type, explanation). This inverts the expected burden: the LLM does the structuring work, the author does the editorial work. Whether this produces better or worse lineage descriptions than author-written ones is an open empirical question.
+**Key observation:** The author writes *less* than the concept paper assumes (no title, no lineage, no type, no speech-act classification), and the LLM proposes *more* (title, lineage, type, question flag, explanation). This inverts the expected burden: the LLM does the structuring work, the author does the editorial work. Whether this produces better or worse lineage descriptions than author-written ones is an open empirical question.
 
 **The rethinking step (4) is significant.** When the author overrides, the LLM doesn't simply accept the correction — it explains why the author's classification is reasonable. This creates a record of interpretive ambiguity that is more informative than a silent override. It is also a test of LLM epistemic humility: can it genuinely argue for a classification it didn't initially propose?
 
 ---
 
-### 4. The Lachenmann Space as Test Case
+### 4. Questions as a Modifier Flag
+
+**Not covered in concept paper.** The concept paper's five branch types (Section 2.3) are all assertions — they describe what a contribution *does* in relation to its parent. But asking a question is a fundamentally different speech act. "What do you mean by X?" is *requesting* clarification, not *providing* it. Questions signal unresolved threads that need attention, and they are structurally important for the health of a deliberation.
+
+**Design decision: modifier, not sixth type.** Rather than adding "question" as a sixth branch type, the prototype implements it as a boolean flag (`is_question`) orthogonal to the type system. A question asking for clarification is still a `clarification` node (same blue color) but with a `?` marker. This preserves the five-type typology while adding expressive power.
+
+**How it works:**
+- The LLM classifies both the branch type AND whether the contribution is a question, in a single call. The prompt defines a question as one that "requests information, clarification, or justification from the parent — it does not itself provide an answer."
+- The review modal displays a "This is a question" checkbox, pre-filled by the LLM. The author can toggle it, just as they can override the type.
+- Question nodes display a white `?` overlaid on the node circle in the graph. Type badges append `?` (e.g. "clarification?").
+- When the author overrides the type and the LLM rethinks, the reclassification also reconsiders whether the contribution is a question.
+
+**Why this matters for the concept paper:**
+The concept paper implicitly treats all contributions as assertions. But in practice, questions are common and serve a distinct structural function: they mark points where the discussion is *incomplete*. A thread ending in a question is qualitatively different from one ending in an assertion — it invites response rather than closure.
+
+The modifier approach has a further advantage: it does not increase the cognitive load of the type system. Five types are already substantial for authors to internalise. A sixth type would flatten the distinction between "what does this contribution do?" (type) and "is this a request or a statement?" (speech act). By keeping them on separate axes, the prototype preserves the clarity of both.
+
+**Implication:** The concept paper should consider formalising this distinction between assertion and question as a cross-cutting property of all branch types, not specific to any one type.
+
+---
+
+### 5. The Lachenmann Space as Test Case
 
 The prototype ships with four pre-loaded discussion spaces. The fourth — *Should our ensemble perform Helmut Lachenmann?* — was constructed as a controlled test of the full branch typology and synthesis flow.
 
@@ -78,7 +99,7 @@ The prototype ships with four pre-loaded discussion spaces. The fourth — *Shou
 
 ---
 
-### 5. Observations for Key Open Questions (Section 8)
+### 6. Observations for Key Open Questions (Section 8)
 
 The prototype does not answer the concept paper's open questions — it is not a user study. But it produces observations relevant to several of them:
 
@@ -93,7 +114,7 @@ The prototype does not display confidence scores. The LLM explanation serves as 
 
 ---
 
-### 6. Deviations from the Concept Paper's Technical Recommendations
+### 7. Deviations from the Concept Paper's Technical Recommendations
 
 | Concept Paper | Prototype | Reason |
 |---|---|---|
