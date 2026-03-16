@@ -256,11 +256,62 @@ export function useGroveNavigation({
     sessionStorage.setItem('grove-position', JSON.stringify(stateRef.current));
   }, []);
 
+  // Animate camera to a target position over durationMs with custom easing
+  // easing: controls zoom interpolation
+  // panEasing: controls x/y interpolation (defaults to same as easing)
+  type Easing = 'ease-in' | 'ease-out' | 'ease-in-out';
+  const easeFn = (t: number, easing: Easing): number => {
+    switch (easing) {
+      case 'ease-in': return t * t * t;
+      case 'ease-out': return 1 - Math.pow(1 - t, 3);
+      case 'ease-in-out': return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+  };
+
+  const zoomTo = useCallback((
+    target: WorldState,
+    durationMs: number = 600,
+    easing: Easing = 'ease-in-out',
+    panEasing?: Easing,
+  ): Promise<void> => {
+    const panEase = panEasing ?? easing;
+    return new Promise((resolve) => {
+      const from = { ...stateRef.current };
+      const startTime = performance.now();
+
+      const tick = () => {
+        const elapsed = performance.now() - startTime;
+        const t = Math.min(elapsed / durationMs, 1);
+        const ez = easeFn(t, easing);
+        const ep = easeFn(t, panEase);
+
+        const current = {
+          x: from.x + (target.x - from.x) * ep,
+          y: from.y + (target.y - from.y) * ep,
+          zoom: from.zoom + (target.zoom - from.zoom) * ez,
+        };
+
+        stateRef.current = { ...current };
+        targetRef.current = { ...current };
+        onUpdate(current);
+
+        if (t < 1) {
+          requestAnimationFrame(tick);
+        } else {
+          resolve();
+        }
+      };
+      requestAnimationFrame(tick);
+    });
+  }, [onUpdate, stateRef, targetRef]);
+
   return {
     containerRef,
     stateRef,
+    targetRef,
     interactedRef,
     restorePosition,
     savePosition,
+    zoomTo,
   };
 }

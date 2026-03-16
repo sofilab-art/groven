@@ -58,6 +58,8 @@ const GrovePage: React.FC = () => {
   const [showNewSpace, setShowNewSpace] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
+  const [transitioning, setTransitioning] = useState(false);
+  const [flyOverlay, setFlyOverlay] = useState(0); // 0-1 opacity for fly-through dark overlay
 
   // SVG ref for viewBox manipulation
   const svgRef = useRef<SVGSVGElement>(null);
@@ -97,7 +99,7 @@ const GrovePage: React.FC = () => {
     }
   }, []);
 
-  const { containerRef, interactedRef, restorePosition, savePosition } = useGroveNavigation({
+  const { containerRef, stateRef, targetRef, interactedRef, restorePosition, savePosition, zoomTo } = useGroveNavigation({
     onUpdate: handleNavigationUpdate,
     initialState: { x: 0, y: GROUND_Y - 60, zoom: 1 },
   });
@@ -136,14 +138,71 @@ const GrovePage: React.FC = () => {
     });
   }, []);
 
-  // Restore position on mount
+  // Restore position on mount — if returning from a space, zoom out from card
   useEffect(() => {
-    restorePosition();
-  }, [restorePosition]);
+    const zoomTarget = sessionStorage.getItem('grove-zoom-target');
+    if (zoomTarget) {
+      try {
+        const { x, y } = JSON.parse(zoomTarget);
+        // Start camera deep inside the card (where the fly-through ended)
+        stateRef.current = { x, y, zoom: 14 };
+        targetRef.current = { x, y, zoom: 14 };
+        handleNavigationUpdate({ x, y, zoom: 14 });
+        setFlyOverlay(1); // Start fully dark
 
-  const handleCardClick = (e: React.MouseEvent, spaceId: string) => {
+        // Then pull back out to the saved overview position
+        const saved = sessionStorage.getItem('grove-position');
+        const overview = saved ? JSON.parse(saved) : { x: 0, y: GROUND_Y - 60, zoom: 1 };
+
+        const pullBackDuration = 1000;
+        requestAnimationFrame(async () => {
+          // Fade the dark overlay out during the zoom-out
+          let start: number | null = null;
+          const animateOverlay = (time: number) => {
+            if (!start) start = time;
+            const progress = Math.min((time - start) / pullBackDuration, 1);
+            const eased = Math.pow(1 - progress, 3); // 1→0 fast fade at start
+            setFlyOverlay(eased);
+            if (progress < 1) requestAnimationFrame(animateOverlay);
+          };
+          requestAnimationFrame(animateOverlay);
+
+          // Zoom out ease-out (fast → slow), pan ease-in (slow → fast settling into overview)
+          await zoomTo(overview, pullBackDuration, 'ease-out', 'ease-in');
+        });
+      } catch { /* ignore */ }
+      sessionStorage.removeItem('grove-zoom-target');
+    } else {
+      restorePosition();
+    }
+  }, [restorePosition, stateRef, targetRef, zoomTo, handleNavigationUpdate]);
+
+  const handleCardClick = async (e: React.MouseEvent, spaceId: string, cardX: number, cardY: number) => {
     e.stopPropagation();
+    if (transitioning) return; // Double-click protection
     savePosition();
+    setTransitioning(true);
+
+    // Save zoom target so we can zoom back out on return
+    sessionStorage.setItem('grove-zoom-target', JSON.stringify({ x: cardX, y: cardY }));
+
+    // Fly into the card: zoom ease-in (slow → fast), pan ease-out (fast → slow)
+    const flyDuration = 1200;
+    zoomTo({ x: cardX, y: cardY, zoom: 14 }, flyDuration, 'ease-in', 'ease-out');
+
+    // Fade dark overlay in sync — same ease-in curve
+    let start: number | null = null;
+    const animateOverlay = (time: number) => {
+      if (!start) start = time;
+      const progress = Math.min((time - start) / flyDuration, 1);
+      const eased = progress * progress * progress; // cubic ease-in to match
+      setFlyOverlay(eased);
+      if (progress < 1) requestAnimationFrame(animateOverlay);
+    };
+    requestAnimationFrame(animateOverlay);
+
+    // Navigate after the fly-through completes
+    await new Promise((r) => setTimeout(r, flyDuration));
     navigate(`/spaces/${spaceId}`);
   };
 
@@ -198,7 +257,7 @@ const GrovePage: React.FC = () => {
   };
 
   return (
-    <div className="grove-page">
+    <div className={`grove-page${transitioning ? ' grove-transitioning' : ''}`}>
       <svg
         ref={setSvgRef}
         width="100%"
@@ -306,7 +365,7 @@ const GrovePage: React.FC = () => {
                   description={card.space.description}
                   visibility={vis}
                   isMatch={isMatch}
-                  onClick={(e) => handleCardClick(e, card.space.id)}
+                  onClick={(e) => handleCardClick(e, card.space.id, card.x, card.y)}
                 />
               </g>
             );
@@ -358,6 +417,14 @@ const GrovePage: React.FC = () => {
           </button>
         )}
       </div>
+
+      {/* Fly-through dark overlay */}
+      {flyOverlay > 0 && (
+        <div
+          className="grove-fly-overlay"
+          style={{ opacity: flyOverlay }}
+        />
+      )}
 
       {/* New space modal */}
       {showNewSpace && (

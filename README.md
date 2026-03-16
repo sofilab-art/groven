@@ -15,6 +15,8 @@ Cards are connected by typed **links** — builds_on, questions, contradicts, re
 - **Concern input** — "What's on your mind?" search bar filters spaces in real-time; if no match, prompts to create a new conversation
 - **Plaza removed from UI** — the Plaza room type is hidden from tabs; the Grove IS the entry experience
 - **Fragment data** — spaces API returns the most recent card body, author, and date for preview in the Grove
+- **Fly-through transitions** — clicking a card triggers a cinematic zoom animation that flies the camera through the card into the space; returning zooms back out to the grove overview. Separate easing curves for pan (ease-out) and zoom (ease-in) create an organic feel.
+- **Back-to-Grove button** — dedicated back arrow in the nav bar for clear navigation from spaces back to the Grove
 
 ### Retained from v5
 
