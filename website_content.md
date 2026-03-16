@@ -33,20 +33,20 @@ Groven is built for the space between.
 
 Groven exists to answer a set of questions that no existing platform has adequately addressed:
 
-**Can structure make discussion better without killing it?**
-What if contributions carried visible semantic relationships — not imposed by a moderator, but proposed by AI and confirmed by the author? Does knowing *how* your idea relates to someone else's change *what* you write?
-
-**Can AI assist without governing?**
-What if AI helped map a conversation — suggested connections, summarised threads, detected questions — but never decided what a contribution means? What if every AI proposal was visible, explainable, and overridable?
+**Can a platform host different modes of civic life?**
+What if the same system supported casual exchange, focused deliberation, formal proposal-making, and binding decisions — without confusing them?
 
 **Can governance grow from conversation?**
 What if voting wasn't a separate tool, but the natural conclusion of a discussion that had been structured well enough to decide? What if the reasoning path from first question to final decision was permanently legible?
 
-**Can a platform host different modes of civic life?**
-What if the same system supported casual exchange, focused deliberation, formal proposal-making, and binding decisions — without confusing them?
-
 **Do communities need to decide everything?**
 What if some matters could remain open, unresolved but not lost? What if non-decision was a legitimate outcome, not a failure?
+
+**Can AI assist without governing?**
+What if AI helped map a conversation — suggested connections, summarised threads, detected questions — but never decided what a contribution means? What if every AI proposal was visible, explainable, and overridable?
+
+**Can structure make discussion better without killing it?**
+What if contributions carried visible semantic relationships — not imposed by a moderator, but proposed by AI and confirmed by the author? Does knowing *how* your idea relates to someone else's change *what* you write?
 
 ---
 
