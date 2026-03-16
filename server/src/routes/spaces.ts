@@ -9,8 +9,27 @@ router.get('/spaces', async (_req: Request, res: Response) => {
     const result = await pool.query(`
       SELECT s.*,
         (SELECT COUNT(*) FROM rooms r WHERE r.space_id = s.id) AS room_count,
-        (SELECT COUNT(*) FROM cards c JOIN rooms r ON c.room_id = r.id WHERE r.space_id = s.id) AS card_count
+        (SELECT COUNT(*) FROM cards c JOIN rooms r ON c.room_id = r.id WHERE r.space_id = s.id) AS card_count,
+        frag.body AS fragment,
+        frag.author_name AS fragment_author,
+        frag.created_at AS fragment_date,
+        oldest.oldest_card_date
       FROM spaces s
+      LEFT JOIN LATERAL (
+        SELECT c.body, u.display_name AS author_name, c.created_at
+        FROM cards c
+        JOIN rooms r ON c.room_id = r.id
+        JOIN users u ON c.author_id = u.id
+        WHERE r.space_id = s.id
+        ORDER BY c.created_at DESC
+        LIMIT 1
+      ) frag ON true
+      LEFT JOIN LATERAL (
+        SELECT MIN(c.created_at) AS oldest_card_date
+        FROM cards c
+        JOIN rooms r ON c.room_id = r.id
+        WHERE r.space_id = s.id
+      ) oldest ON true
       ORDER BY s.created_at DESC
     `);
     res.json(result.rows);

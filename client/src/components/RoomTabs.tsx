@@ -42,13 +42,13 @@ export default function RoomTabs({ rooms, activeRoomId, onSelectRoom, spaceId, o
   return (
     <div className="room-tabs-container">
       <div className="room-tabs">
-        {rooms.map(room => (
+        {rooms.filter(room => room.room_type !== 'plaza').map(room => (
           <button
             key={room.id}
             className={`room-tab ${room.id === activeRoomId ? 'active' : ''}`}
             onClick={() => onSelectRoom(room.id)}
           >
-            <span className="room-tab-icon">{room.room_type === 'plaza' ? '🏛️' : '🔲'}</span>
+            <span className="room-tab-icon">🔲</span>
             <span>{room.title}</span>
             <span className="room-tab-count">{room.card_count}</span>
           </button>

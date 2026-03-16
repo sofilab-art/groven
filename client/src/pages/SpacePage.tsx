@@ -50,8 +50,11 @@ export default function SpacePage() {
         setSpace(spaceData);
         setRooms(roomsData);
         if (roomsData.length > 0) {
-          setActiveRoomId(roomsData[0].id);
-          loadGraph(roomsData[0].id);
+          // Prefer first Table room over Plaza
+          const firstTable = roomsData.find((r: any) => r.room_type === 'table');
+          const defaultRoom = firstTable || roomsData[0];
+          setActiveRoomId(defaultRoom.id);
+          loadGraph(defaultRoom.id);
         }
       })
       .finally(() => setLoading(false));

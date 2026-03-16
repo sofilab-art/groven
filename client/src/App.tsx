@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
-import HomePage from './pages/HomePage';
+import GrovePage from './pages/GrovePage';
 import SpacePage from './pages/SpacePage';
 import CardPage from './pages/CardPage';
 
@@ -21,8 +21,9 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
+      {/* Grove renders outside Layout — full-screen dark experience */}
+      <Route path="/" element={<ProtectedRoute><GrovePage /></ProtectedRoute>} />
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-        <Route path="/" element={<HomePage />} />
         <Route path="/spaces/:spaceId" element={<SpacePage />} />
         <Route path="/cards/:cardId" element={<CardPage />} />
       </Route>
