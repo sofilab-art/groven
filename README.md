@@ -6,23 +6,28 @@
 
 ---
 
-**Concept v6: Grove entry experience, multi-room model, 10 card types, multi-link graph, multiple readings, temperature voting.**
+**Concept v7: 3D Grove entry experience (Three.js), multi-room model, 10 card types, multi-link graph, multiple readings, temperature voting.**
 
 Groven tests a core hypothesis: does typing and linking contributions change how people deliberate? Every contribution is a **card** with a semantic type proposed by an AI, confirmed or overridden by the author. When the author disagrees with the AI's classification, the card is marked **contested**, making disagreement visible in the graph.
 
 Cards are connected by typed **links** — builds_on, questions, contradicts, reframes, supports, evidences, amends, answers, spins_off, implements — forming a multi-link deliberation graph rather than a flat thread or simple tree.
 
-## What's new in v6
+## What's new in v7
 
-- **The Grove** — full-screen dark forest landscape as the platform entry point. Spaces appear as cards growing from a shared ground plane. Navigate by scrolling (zoom/depth), trackpad swiping (lateral), or dragging. Stars twinkle above, decorative plants sway between cards, and ground fog drifts along the ground line.
-- **Semantic zoom** — as you zoom toward a card, it progressively reveals more information: title → author → fragment → full description
-- **Depth variation** — cards are staggered at different depths with perspective scaling (farther cards appear smaller and slightly faded)
-- **Decorative atmosphere** — 5 plant types (grass tufts, ferns, sprouts, tall grass, moss clusters) at various scales and opacities, all rooted at the ground level
-- **Concern input** — "What's on your mind?" search bar filters spaces in real-time; if no match, prompts to create a new conversation
-- **Plaza removed from UI** — the Plaza room type is hidden from tabs; the Grove IS the entry experience
-- **Fragment data** — spaces API returns the most recent card body, author, and date for preview in the Grove
-- **Fly-through transitions** — clicking a card triggers a cinematic zoom animation that flies the camera through the card into the space; returning zooms back out to the grove overview. Separate easing curves for pan (ease-out) and zoom (ease-in) create an organic feel.
-- **Back-to-Grove button** — dedicated back arrow in the nav bar for clear navigation from spaces back to the Grove
+- **3D Grove** — the entry experience is now a real Three.js (React Three Fiber) 3D environment. The camera is at ground level; the user walks through floating cards in a dark forest scene with fog, ambient lighting, and glowing ground particles.
+- **Ground-level camera** — cards occlude each other naturally as you move through the grove, creating a sense of physical space and discovery.
+- **Trackpad navigation** — two-finger swipe to walk forward/back and strafe left/right; pinch to zoom-walk; click-drag to pan; all with smooth lerp and inertia.
+- **Distance fog** — Three.js exponential fog fades distant cards naturally, reinforcing depth.
+- **Fly-through transitions** — clicking a card triggers a smooth camera fly-through animation into the space; the scene darkens with an overlay during the transition.
+- **Per-frame DOM opacity** — card visibility and pointer events are computed per frame via direct DOM manipulation (no React state updates), keeping 60fps with 13+ cards.
+- **Ground particles** — 300 animated glowing dots on the ground plane add atmosphere.
+
+### Retained from v6
+
+- **Concern input** — "What's on your mind?" search bar filters spaces in real-time
+- **Fragment data** — spaces API returns the most recent card body, author, and date for preview
+- **Back-to-Grove button** — dedicated back arrow in the nav bar
+- **Plaza removed from UI** — the Grove IS the entry experience
 
 ### Retained from v5
 
@@ -36,7 +41,7 @@ Cards are connected by typed **links** — builds_on, questions, contradicts, re
 ## Stack
 
 - **Backend:** Node.js + TypeScript + Express
-- **Frontend:** React 19 + Vite + D3.js v7
+- **Frontend:** React 19 + Vite + Three.js (React Three Fiber) + D3.js v7
 - **Database:** PostgreSQL (Supabase)
 - **LLM:** Mistral AI (`@mistralai/mistralai` SDK)
   - `mistral-small-latest` — classification, titles, lineage, reclassification
@@ -100,19 +105,14 @@ Opens Express on `:3000` and Vite on `:5173`. Visit http://localhost:5173.
 
 ### The Grove (entry experience)
 
-The Grove is a full-screen dark SVG landscape. Spaces appear as translucent cards anchored to a shared ground plane, spread horizontally with depth variation. Background layers include:
+The Grove is a full-screen Three.js 3D scene rendered with React Three Fiber. The camera is positioned at ground level (y=1.6), looking into a dark forest where space cards float at varying depths. The scene uses:
 
-- **Starfield** — 80 twinkling stars above the ground line (parallax layer)
-- **Decorative plants** — grass, ferns, sprouts, and moss growing from the ground
-- **Ground fog** — multiple overlapping fog ellipses drifting along the ground
+- **Three.js fog** — exponential distance fog fading cards naturally
+- **Ground particles** — 300 animated glowing dots scattered on the ground plane
+- **Ambient + directional lighting** — subtle green-tinted illumination
+- **Per-frame DOM updates** — card opacity and pointer events computed via direct DOM manipulation for 60fps performance
 
-Navigation: scroll to zoom in/out, trackpad swipe or drag to pan, arrow keys/WASD for keyboard control. Position is saved to session storage and restored on back-navigation.
-
-**Semantic zoom** progressively reveals card content as you approach:
-- Far: title only (minimal)
-- Medium: title + author
-- Close: title + author + first sentence of fragment
-- Very close: full fragment + space description
+Navigation: two-finger swipe (forward/back + lateral), pinch-zoom, click-drag to pan. Camera position is saved to session storage and restored on back-navigation.
 
 ### Data model
 

@@ -1,7 +1,10 @@
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
 
-dotenv.config({ path: '../.env' });
+import path from 'path';
+
+// Load .env from project root regardless of CWD
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

@@ -60,8 +60,8 @@ const GroveCard: React.FC<GroveCardProps> = ({
         height={height}
         rx={8}
         ry={8}
-        fill="rgba(27, 67, 50, 0.55)"
-        stroke="rgba(116, 198, 157, 0.3)"
+        fill="rgba(14, 42, 30, 0.92)"
+        stroke="rgba(116, 198, 157, 0.25)"
         strokeWidth={1}
       />
 
@@ -105,7 +105,7 @@ const GroveCard: React.FC<GroveCardProps> = ({
         fontWeight="500"
         opacity={visibility === 'minimal' ? 0.5 : 0.85}
       >
-        {title.length > 30 ? title.slice(0, 28) + '...' : title}
+        {title.length > 26 ? title.slice(0, 24) + '\u2026' : title}
       </text>
 
       {/* Card count badge */}

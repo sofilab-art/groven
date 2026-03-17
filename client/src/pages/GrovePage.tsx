@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../api';
-import { useGroveNavigation, WorldState } from '../hooks/useGroveNavigation';
-import Starfield from '../components/grove/Starfield';
-import DecoPlants from '../components/grove/DecoPlants';
-import GroveCard from '../components/grove/GroveCard';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
+import * as THREE from 'three';
 
 interface SpaceData {
   id: string;
@@ -20,10 +19,11 @@ interface SpaceData {
   created_at: string;
 }
 
-interface CardPosition {
+interface Card3D {
   space: SpaceData;
-  x: number;
-  y: number;
+  x: number; // lateral position
+  z: number; // depth into the grove (negative = further away)
+  y: number; // slight vertical offset
 }
 
 // Seeded random for consistent placement
@@ -39,185 +39,376 @@ function seededRandom(seed: string) {
   };
 }
 
-// Base viewBox dimensions at zoom=1
-const BASE_WIDTH = 1400;
-const BASE_HEIGHT = 1000;
+// Layout constants
+const DEPTH_RANGE = 30; // cards spread 30 units deep into the scene
+const LATERAL_RANGE = 12; // cards spread 12 units wide
+const CAMERA_START_Z = 12; // camera starts at the near edge
 
-// World spread for card placement — horizontal grove layout
-const WORLD_SPREAD_X = 1200;
-const GROUND_Y = 180; // Ground line in world coordinates
-const DEPTH_SPREAD = 120; // How much cards vary in depth (Y)
+// ──────────────────────────────────────────
+// 3D Card component — an HTML card floating in 3D space
+// ──────────────────────────────────────────
+interface GroveCard3DProps {
+  card: Card3D;
+  onClick: () => void;
+  isMatch: boolean;
+}
 
+function getFirstSentence(text: string): string {
+  const match = text.match(/^[^.!?]*[.!?]/);
+  return match ? match[0].trim() : text.slice(0, 100);
+}
+
+const GroveCard3D: React.FC<GroveCard3DProps> = ({ card, onClick, isMatch }) => {
+  const cardCount = Number(card.space.card_count) || 1;
+  const baseWidth = cardCount <= 2 ? 2.0 : cardCount <= 5 ? 2.4 : cardCount <= 12 ? 2.8 : 3.2;
+  const dots = Math.min(cardCount, 12);
+  const htmlRef = useRef<HTMLDivElement>(null);
+
+  // Use a single useFrame with direct DOM updates — NO React state updates
+  const { camera } = useThree();
+  const pos = useMemo(() => new THREE.Vector3(card.x, card.y, card.z), [card.x, card.y, card.z]);
+  const camDir = useMemo(() => new THREE.Vector3(), []);
+  const toCard = useMemo(() => new THREE.Vector3(), []);
+
+  useFrame(() => {
+    if (!htmlRef.current) return;
+    const dist = camera.position.distanceTo(pos);
+
+    // Compute opacity via direct DOM manipulation — no setState
+    camDir.set(0, 0, -1).applyQuaternion(camera.quaternion);
+    toCard.subVectors(pos, camera.position);
+    const behind = camDir.dot(toCard);
+    let alpha = 1;
+    if (behind < -2) alpha = 0;
+    else if (behind < 1) alpha = (behind + 2) / 3;
+    else if (dist > 15) alpha = Math.max(0.1, 1 - (dist - 15) / 15);
+    alpha *= isMatch ? 1 : 0.15;
+    htmlRef.current.style.opacity = String(alpha);
+    htmlRef.current.style.pointerEvents = alpha > 0.1 ? 'auto' : 'none';
+  });
+
+  // Determine initial visibility from fragment availability (static — fog handles distance)
+  const hasFragment = !!card.space.fragment;
+  const hasAuthor = !!card.space.fragment_author;
+
+  // Forward wheel events to the canvas so trackpad scrolling works through cards
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    // Re-dispatch the wheel event on the canvas so the camera controller picks it up
+    const canvas = (e.target as HTMLElement).closest('.grove-page')?.querySelector('canvas');
+    if (canvas) {
+      canvas.parentElement?.dispatchEvent(new WheelEvent('wheel', {
+        deltaX: e.deltaX, deltaY: e.deltaY, deltaMode: e.deltaMode,
+        ctrlKey: e.ctrlKey, clientX: e.clientX, clientY: e.clientY,
+        bubbles: true, cancelable: true,
+      }));
+    }
+  }, []);
+
+  return (
+    <group position={[card.x, card.y, card.z]}>
+      <Html
+        transform
+        distanceFactor={8}
+        style={{ width: `${baseWidth * 60}px`, pointerEvents: 'none' }}
+      >
+        <div
+          ref={htmlRef}
+          className="grove3d-card"
+          style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+          onClick={(e) => { e.stopPropagation(); onClick(); }}
+          onWheel={handleWheel}
+        >
+          <div className="grove3d-card-title">
+            {card.space.title.length > 30 ? card.space.title.slice(0, 28) + '\u2026' : card.space.title}
+            <span className="grove3d-card-count">{cardCount}</span>
+          </div>
+
+          {hasAuthor && (
+            <div className="grove3d-card-author">{card.space.fragment_author}</div>
+          )}
+
+          {hasFragment && (
+            <div className="grove3d-card-fragment">
+              {getFirstSentence(card.space.fragment!).slice(0, 100)}
+            </div>
+          )}
+
+          <div className="grove3d-card-dots">
+            {Array.from({ length: dots }, (_, i) => (
+              <span key={i} className="grove3d-dot" style={{ opacity: 0.3 + (i / dots) * 0.5 }} />
+            ))}
+          </div>
+        </div>
+      </Html>
+    </group>
+  );
+};
+
+// ──────────────────────────────────────────
+// Camera controller — drag to pan, scroll to move forward/back
+// ──────────────────────────────────────────
+interface CameraControllerProps {
+  transitioning: boolean;
+  flyTarget: { x: number; y: number; z: number } | null;
+  onFlyComplete: () => void;
+}
+
+const CameraController: React.FC<CameraControllerProps> = ({ transitioning, flyTarget, onFlyComplete }) => {
+  const { camera, gl } = useThree();
+  const isDragging = useRef(false);
+  const lastMouse = useRef({ x: 0, y: 0 });
+  const velocity = useRef({ x: 0, z: 0 });
+  const targetPos = useRef(new THREE.Vector3(0, 1.6, CAMERA_START_Z));
+  const flyProgress = useRef(0);
+  const flyFrom = useRef(new THREE.Vector3());
+  const interacted = useRef(false);
+
+  // Restore saved position
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('grove-camera');
+      if (saved) {
+        const { x, y, z } = JSON.parse(saved);
+        camera.position.set(x, y, z);
+        targetPos.current.set(x, y, z);
+      } else {
+        camera.position.set(0, 1.6, CAMERA_START_Z);
+        targetPos.current.set(0, 1.6, CAMERA_START_Z);
+      }
+    } catch { /* ignore */ }
+    camera.lookAt(0, 1, -10);
+  }, [camera]);
+
+  useEffect(() => {
+    // Attach to the parent container (not canvas) so events aren't blocked by Html overlays
+    const el = gl.domElement.parentElement || gl.domElement;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      interacted.current = true;
+
+      if (e.ctrlKey) {
+        // Trackpad pinch → zoom (walk forward/back faster)
+        const speed = e.deltaY * 0.05;
+        targetPos.current.z -= speed;
+      } else {
+        // Two-finger swipe: deltaX → lateral, deltaY → walk forward/back
+        targetPos.current.z -= e.deltaY * 0.015;
+        targetPos.current.x += e.deltaX * 0.015;
+      }
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      isDragging.current = true;
+      lastMouse.current = { x: e.clientX, y: e.clientY };
+      velocity.current = { x: 0, z: 0 };
+      el.style.cursor = 'grabbing';
+      interacted.current = true;
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current) return;
+      const dx = (e.clientX - lastMouse.current.x) * 0.02;
+      const dy = (e.clientY - lastMouse.current.y) * 0.02;
+      targetPos.current.x -= dx;
+      targetPos.current.z -= dy; // drag up = move forward into grove
+      velocity.current = { x: -dx, z: -dy };
+      lastMouse.current = { x: e.clientX, y: e.clientY };
+    };
+
+    const onMouseUp = () => {
+      isDragging.current = false;
+      el.style.cursor = 'grab';
+    };
+
+    // Touch handlers
+    let touchStart = { x: 0, y: 0 };
+    let touchWorldStart = { x: 0, z: 0 };
+    let lastPinchDist = 0;
+
+    const onTouchStart = (e: TouchEvent) => {
+      interacted.current = true;
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        touchStart = { x: t.clientX, y: t.clientY };
+        touchWorldStart = { x: targetPos.current.x, z: targetPos.current.z };
+        velocity.current = { x: 0, z: 0 };
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        lastPinchDist = Math.sqrt(dx * dx + dy * dy);
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        const dx = (t.clientX - touchStart.x) * 0.02;
+        const dy = (t.clientY - touchStart.y) * 0.02;
+        targetPos.current.x = touchWorldStart.x - dx;
+        targetPos.current.z = touchWorldStart.z - dy;
+      } else if (e.touches.length === 2) {
+        // Pinch to zoom (walk forward/back)
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (lastPinchDist > 0) {
+          const delta = (dist - lastPinchDist) * 0.03;
+          targetPos.current.z -= delta; // pinch out = walk forward
+        }
+        lastPinchDist = dist;
+      }
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+    };
+  }, [gl, camera]);
+
+  // Start fly animation when flyTarget changes
+  useEffect(() => {
+    if (flyTarget) {
+      flyFrom.current.copy(camera.position);
+      flyProgress.current = 0;
+    }
+  }, [flyTarget, camera]);
+
+  useFrame((_, delta) => {
+    if (transitioning && flyTarget) {
+      // Fly-through animation
+      flyProgress.current = Math.min(flyProgress.current + delta * 0.8, 1);
+      const t = flyProgress.current;
+      const ease = t * t * (3 - 2 * t); // smoothstep
+      camera.position.lerpVectors(
+        flyFrom.current,
+        new THREE.Vector3(flyTarget.x, flyTarget.y + 0.5, flyTarget.z + 1.5),
+        ease
+      );
+      camera.lookAt(flyTarget.x, flyTarget.y + 0.5, flyTarget.z);
+      if (t >= 1) onFlyComplete();
+      return;
+    }
+
+    // Normal movement with lerp + inertia
+    if (!isDragging.current) {
+      targetPos.current.x += velocity.current.x * 0.5;
+      targetPos.current.z += velocity.current.z * 0.5;
+      velocity.current.x *= 0.92;
+      velocity.current.z *= 0.92;
+    }
+
+    camera.position.lerp(targetPos.current, 0.08);
+    camera.lookAt(camera.position.x, 1, camera.position.z - 15);
+
+    // Save position
+    sessionStorage.setItem('grove-camera', JSON.stringify({
+      x: camera.position.x, y: camera.position.y, z: camera.position.z
+    }));
+  });
+
+  return null;
+};
+
+// ──────────────────────────────────────────
+// Particle ground — small glowing dots scattered on the ground
+// ──────────────────────────────────────────
+const GroundParticles: React.FC = () => {
+  const pointsRef = useRef<THREE.Points>(null);
+
+  const { positions, opacities } = useMemo(() => {
+    const count = 300;
+    const pos = new Float32Array(count * 3);
+    const opa = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * LATERAL_RANGE * 2.5;
+      pos[i * 3 + 1] = Math.random() * 0.1;
+      pos[i * 3 + 2] = Math.random() * -DEPTH_RANGE * 1.2;
+      opa[i] = Math.random() * 0.5 + 0.1;
+    }
+    return { positions: pos, opacities: opa };
+  }, []);
+
+  useFrame(({ clock }) => {
+    if (!pointsRef.current) return;
+    const geo = pointsRef.current.geometry;
+    const posAttr = geo.getAttribute('position');
+    const t = clock.elapsedTime;
+    for (let i = 0; i < opacities.length; i++) {
+      (posAttr.array as Float32Array)[i * 3 + 1] =
+        Math.sin(t * 0.5 + i) * 0.05 + 0.05;
+    }
+    posAttr.needsUpdate = true;
+  });
+
+  return (
+    <points ref={pointsRef}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial color="#74C69D" size={0.06} transparent opacity={0.4} sizeAttenuation />
+    </points>
+  );
+};
+
+// ──────────────────────────────────────────
+// Main GrovePage component
+// ──────────────────────────────────────────
 const GrovePage: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout: doLogout } = useAuth();
   const [spaces, setSpaces] = useState<SpaceData[]>([]);
-  const [cards, setCards] = useState<CardPosition[]>([]);
+  const [cards, setCards] = useState<Card3D[]>([]);
   const [searchText, setSearchText] = useState('');
   const [showHint, setShowHint] = useState(true);
   const [showNewSpace, setShowNewSpace] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [transitioning, setTransitioning] = useState(false);
-  const [flyOverlay, setFlyOverlay] = useState(0); // 0-1 opacity for fly-through dark overlay
+  const [flyTarget, setFlyTarget] = useState<{ x: number; y: number; z: number } | null>(null);
+  const [flyOverlay, setFlyOverlay] = useState(0);
+  const flySpaceId = useRef('');
 
-  // SVG ref for viewBox manipulation
-  const svgRef = useRef<SVGSVGElement>(null);
-
-  // Layer group refs for parallax offsets
-  const layer0Ref = useRef<SVGGElement>(null);
-
-  // Track current state for semantic zoom calculations — start centered on the ground
-  const currentState = useRef<WorldState>({ x: 0, y: GROUND_Y - 60, zoom: 1 });
-  const [, forceUpdate] = useState(0);
-  const updateTimerRef = useRef<number>(0);
-
-  const handleNavigationUpdate = useCallback((state: WorldState) => {
-    currentState.current = state;
-
-    // Update viewBox: higher zoom = smaller viewBox = closer
-    const vbWidth = BASE_WIDTH / state.zoom;
-    const vbHeight = BASE_HEIGHT / state.zoom;
-    const vbX = state.x - vbWidth / 2;
-    const vbY = state.y - vbHeight / 2;
-
-    if (svgRef.current) {
-      svgRef.current.setAttribute('viewBox', `${vbX} ${vbY} ${vbWidth} ${vbHeight}`);
-    }
-
-    // Parallax: background layers counteract camera to move slower
-    if (layer0Ref.current) {
-      layer0Ref.current.setAttribute('transform', `translate(${state.x * 0.9}, ${state.y * 0.9})`);
-    }
-
-    // Throttled React re-render for semantic zoom (10fps)
-    if (!updateTimerRef.current) {
-      updateTimerRef.current = window.setTimeout(() => {
-        updateTimerRef.current = 0;
-        forceUpdate((n) => n + 1);
-      }, 100);
-    }
-  }, []);
-
-  const { containerRef, stateRef, targetRef, interactedRef, restorePosition, savePosition, zoomTo } = useGroveNavigation({
-    onUpdate: handleNavigationUpdate,
-    initialState: { x: 0, y: GROUND_Y - 60, zoom: 1 },
-  });
-
-  // Merge refs
-  const setSvgRef = useCallback((el: SVGSVGElement | null) => {
-    (svgRef as React.MutableRefObject<SVGSVGElement | null>).current = el;
-    (containerRef as React.MutableRefObject<SVGSVGElement | null>).current = el;
-  }, [containerRef]);
-
-  // Hide hint after first interaction
-  useEffect(() => {
-    if (interactedRef.current && showHint) {
-      const timer = setTimeout(() => setShowHint(false), 1500);
-      return () => clearTimeout(timer);
-    }
-  });
-
-  // Fetch spaces and compute card positions
+  // Fetch spaces and compute 3D positions
   useEffect(() => {
     api.getSpaces().then((data: SpaceData[]) => {
       setSpaces(data);
 
-      // Spread cards along X with depth (Y) variation — like trees at different distances
-      const spacing = WORLD_SPREAD_X / Math.max(data.length, 1);
-      const positioned: CardPosition[] = data.map((space, i) => {
+      // Place cards in 3D: spread in X and Z, slight Y variation
+      const cols = Math.ceil(Math.sqrt(data.length * 0.8));
+      const rows = Math.ceil(data.length / cols);
+      const cellW = LATERAL_RANGE / cols;
+      const cellD = DEPTH_RANGE / rows;
+
+      const positioned: Card3D[] = data.map((space, i) => {
         const rng = seededRandom(space.id);
-        const x = (i - (data.length - 1) / 2) * spacing + (rng() - 0.5) * spacing * 0.3;
-        // Stagger depth: each card at a different distance from viewer
-        const depthOffset = (rng() - 0.5) * DEPTH_SPREAD;
-        const y = GROUND_Y + depthOffset;
-        return { space, x, y };
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = (col - (cols - 1) / 2) * cellW + (rng() - 0.5) * cellW * 0.5;
+        const z = -(row * cellD + rng() * cellD * 0.4); // negative Z = deeper into scene
+        const y = 0.8 + rng() * 0.8; // cards float between 0.8 and 1.6 height
+        return { space, x, y, z };
       });
 
       setCards(positioned);
     });
   }, []);
 
-  // Restore position on mount — if returning from a space, zoom out from card
-  useEffect(() => {
-    const zoomTarget = sessionStorage.getItem('grove-zoom-target');
-    if (zoomTarget) {
-      try {
-        const { x, y } = JSON.parse(zoomTarget);
-        // Start camera deep inside the card (where the fly-through ended)
-        stateRef.current = { x, y, zoom: 14 };
-        targetRef.current = { x, y, zoom: 14 };
-        handleNavigationUpdate({ x, y, zoom: 14 });
-        setFlyOverlay(1); // Start fully dark
-
-        // Then pull back out to the saved overview position
-        const saved = sessionStorage.getItem('grove-position');
-        const overview = saved ? JSON.parse(saved) : { x: 0, y: GROUND_Y - 60, zoom: 1 };
-
-        const pullBackDuration = 1000;
-        requestAnimationFrame(async () => {
-          // Fade the dark overlay out during the zoom-out
-          let start: number | null = null;
-          const animateOverlay = (time: number) => {
-            if (!start) start = time;
-            const progress = Math.min((time - start) / pullBackDuration, 1);
-            const eased = Math.pow(1 - progress, 3); // 1→0 fast fade at start
-            setFlyOverlay(eased);
-            if (progress < 1) requestAnimationFrame(animateOverlay);
-          };
-          requestAnimationFrame(animateOverlay);
-
-          // Zoom out ease-out (fast → slow), pan ease-in (slow → fast settling into overview)
-          await zoomTo(overview, pullBackDuration, 'ease-out', 'ease-in');
-        });
-      } catch { /* ignore */ }
-      sessionStorage.removeItem('grove-zoom-target');
-    } else {
-      restorePosition();
-    }
-  }, [restorePosition, stateRef, targetRef, zoomTo, handleNavigationUpdate]);
-
-  const handleCardClick = async (e: React.MouseEvent, spaceId: string, cardX: number, cardY: number) => {
-    e.stopPropagation();
-    if (transitioning) return; // Double-click protection
-    savePosition();
-    setTransitioning(true);
-
-    // Save zoom target so we can zoom back out on return
-    sessionStorage.setItem('grove-zoom-target', JSON.stringify({ x: cardX, y: cardY }));
-
-    // Fly into the card: zoom ease-in (slow → fast), pan ease-out (fast → slow)
-    const flyDuration = 1200;
-    zoomTo({ x: cardX, y: cardY, zoom: 14 }, flyDuration, 'ease-in', 'ease-out');
-
-    // Fade dark overlay in sync — same ease-in curve
-    let start: number | null = null;
-    const animateOverlay = (time: number) => {
-      if (!start) start = time;
-      const progress = Math.min((time - start) / flyDuration, 1);
-      const eased = progress * progress * progress; // cubic ease-in to match
-      setFlyOverlay(eased);
-      if (progress < 1) requestAnimationFrame(animateOverlay);
-    };
-    requestAnimationFrame(animateOverlay);
-
-    // Navigate after the fly-through completes
-    await new Promise((r) => setTimeout(r, flyDuration));
-    navigate(`/spaces/${spaceId}`);
-  };
-
-  const handleCreateSpace = async () => {
-    if (!newTitle.trim()) return;
-    try {
-      const result = await api.createSpace(newTitle, newDesc);
-      savePosition();
-      navigate(`/spaces/${result.id}`);
-    } catch (err) {
-      console.error('Failed to create space:', err);
-    }
-  };
-
-  // Filter by search
+  // Search filtering
   const matchingIds = searchText.trim()
     ? new Set(
         spaces
@@ -233,145 +424,74 @@ const GrovePage: React.FC = () => {
       )
     : null;
 
-  // Semantic zoom visibility based on zoom level and distance from center
-  const getVisibility = (card: CardPosition): 'minimal' | 'title' | 'author' | 'sentence' | 'full' => {
-    const state = currentState.current;
-    const vbWidth = BASE_WIDTH / state.zoom;
+  const handleCardClick = useCallback((spaceId: string, x: number, y: number, z: number) => {
+    if (transitioning) return;
+    setTransitioning(true);
+    flySpaceId.current = spaceId;
+    setFlyTarget({ x, y, z });
 
-    const dx = card.x - state.x;
-    const dy = card.y - state.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const normalizedDist = dist / vbWidth;
+    // Fade overlay
+    let start: number | null = null;
+    const animate = (time: number) => {
+      if (!start) start = time;
+      const t = Math.min((time - start) / 1200, 1);
+      setFlyOverlay(t * t * t);
+      if (t < 1) requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+  }, [transitioning]);
 
-    // Card apparent width: larger cards at higher zoom
-    const cardCount = Number(card.space.card_count) || 1;
-    const cardW = cardCount <= 2 ? 140 : cardCount <= 5 ? 170 : cardCount <= 12 ? 200 : 240;
-    const apparentSize = cardW / vbWidth;
+  const handleFlyComplete = useCallback(() => {
+    navigate(`/spaces/${flySpaceId.current}`);
+  }, [navigate]);
 
-    // Progressive reveal thresholds
-    if (apparentSize < 0.08 || normalizedDist > 0.8) return 'minimal';
-    if (apparentSize < 0.14 || normalizedDist > 0.5) return 'title';
-    if (apparentSize < 0.22 || normalizedDist > 0.35) return 'author';
-    if (apparentSize < 0.35 || normalizedDist > 0.2) return 'sentence';
-    return 'full';
+  const handleCreateSpace = async () => {
+    if (!newTitle.trim()) return;
+    try {
+      const result = await api.createSpace(newTitle, newDesc);
+      navigate(`/spaces/${result.id}`);
+    } catch (err) {
+      console.error('Failed to create space:', err);
+    }
   };
 
   return (
-    <div className={`grove-page${transitioning ? ' grove-transitioning' : ''}`}>
-      <svg
-        ref={setSvgRef}
-        width="100%"
-        height="100%"
-        viewBox={`${-BASE_WIDTH / 2} ${-BASE_HEIGHT / 2} ${BASE_WIDTH} ${BASE_HEIGHT}`}
-        preserveAspectRatio="xMidYMid slice"
-        style={{ touchAction: 'none' }}
+    <div className="grove-page">
+      <Canvas
+        camera={{ position: [0, 1.6, CAMERA_START_Z], fov: 60, near: 0.1, far: 60 }}
+        style={{ background: '#080f07' }}
+        gl={{ antialias: true }}
       >
-        {/* Layer 0: Stars (slowest parallax) */}
-        <g ref={layer0Ref}>
-          <Starfield width={WORLD_SPREAD_X * 3} height={1200} groundY={GROUND_Y} />
-        </g>
+        <fog attach="fog" args={['#080f07', 8, 35]} />
+        <ambientLight intensity={0.3} />
+        <directionalLight position={[5, 10, 5]} intensity={0.2} color="#74C69D" />
 
-        {/* Decorative plants on the ground — clearly visible, rooted at ground level */}
-        <DecoPlants count={20} width={WORLD_SPREAD_X} height={GROUND_Y} depthSpread={DEPTH_SPREAD} seed={13} scaleRange={[1.5, 3.0]} opacityRange={[0.3, 0.6]} />
-        <DecoPlants count={15} width={WORLD_SPREAD_X} height={GROUND_Y} depthSpread={DEPTH_SPREAD} seed={77} scaleRange={[2.5, 5.0]} opacityRange={[0.35, 0.65]} />
+        {/* Ground plane */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -DEPTH_RANGE / 2]} receiveShadow>
+          <planeGeometry args={[LATERAL_RANGE * 4, DEPTH_RANGE * 2]} />
+          <meshStandardMaterial color="#0a1a10" />
+        </mesh>
 
-        {/* Ground plane — deep fog + gradient at the ground line */}
-        <defs>
-          <linearGradient id="groundGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#1B4332" stopOpacity="0.15" />
-            <stop offset="30%" stopColor="#2D6A4F" stopOpacity="0.08" />
-            <stop offset="100%" stopColor="#080f07" stopOpacity="0" />
-          </linearGradient>
-          <radialGradient id="groundFog" cx="50%" cy="0%" rx="50%" ry="100%">
-            <stop offset="0%" stopColor="#74C69D" stopOpacity="0.12" />
-            <stop offset="40%" stopColor="#2D6A4F" stopOpacity="0.07" />
-            <stop offset="100%" stopColor="#080f07" stopOpacity="0" />
-          </radialGradient>
-          <radialGradient id="groundFog2" cx="50%" cy="20%" rx="50%" ry="100%">
-            <stop offset="0%" stopColor="#74C69D" stopOpacity="0.08" />
-            <stop offset="50%" stopColor="#40916C" stopOpacity="0.04" />
-            <stop offset="100%" stopColor="#080f07" stopOpacity="0" />
-          </radialGradient>
-        </defs>
-        <rect
-          x={-WORLD_SPREAD_X * 1.5}
-          y={GROUND_Y}
-          width={WORLD_SPREAD_X * 3}
-          height={500}
-          fill="url(#groundGrad)"
-        />
-        {/* Deep ground fog — multiple overlapping layers for volume */}
-        <ellipse
-          cx={0}
-          cy={GROUND_Y + 10}
-          rx={WORLD_SPREAD_X * 1.4}
-          ry={80}
-          fill="url(#groundFog)"
-          style={{ animation: 'fogDrift 30s ease-in-out infinite' }}
-        />
-        <ellipse
-          cx={200}
-          cy={GROUND_Y + 25}
-          rx={WORLD_SPREAD_X * 1.0}
-          ry={60}
-          fill="url(#groundFog2)"
-          style={{ animation: 'fogDrift 45s ease-in-out 3s infinite reverse' }}
-        />
-        <ellipse
-          cx={-400}
-          cy={GROUND_Y + 5}
-          rx={WORLD_SPREAD_X * 0.7}
-          ry={45}
-          fill="#74C69D"
-          opacity={0.04}
-          style={{ animation: 'fogDrift 35s ease-in-out 8s infinite' }}
-        />
-        <ellipse
-          cx={100}
-          cy={GROUND_Y + 40}
-          rx={WORLD_SPREAD_X * 1.2}
-          ry={100}
-          fill="#2D6A4F"
-          opacity={0.05}
-          style={{ animation: 'fogDrift 50s ease-in-out 12s infinite reverse' }}
-        />
-        {/* Subtle ground horizon line */}
-        <line
-          x1={-WORLD_SPREAD_X * 1.5}
-          y1={GROUND_Y - DEPTH_SPREAD / 2}
-          x2={WORLD_SPREAD_X * 1.5}
-          y2={GROUND_Y - DEPTH_SPREAD / 2}
-          stroke="#2D6A4F"
-          strokeWidth={0.3}
-          opacity={0.08}
+        {/* Ground particles */}
+        <GroundParticles />
+
+        {/* Camera controller */}
+        <CameraController
+          transitioning={transitioning}
+          flyTarget={flyTarget}
+          onFlyComplete={handleFlyComplete}
         />
 
-        {/* Layer 3: Cards (1:1 with camera via viewBox) — sorted by Y so farther cards render first */}
-        <g>
-          {[...cards].sort((a, b) => a.y - b.y).map((card) => {
-            const vis = getVisibility(card);
-            const isMatch = matchingIds === null || matchingIds.has(card.space.id);
-            // Depth-based scale: cards farther away (lower Y) are slightly smaller
-            const depthNorm = (card.y - (GROUND_Y - DEPTH_SPREAD / 2)) / DEPTH_SPREAD; // 0=far, 1=near
-            const depthScale = 0.75 + depthNorm * 0.25; // 0.75 to 1.0
-            const depthOpacity = 0.6 + depthNorm * 0.4; // 0.6 to 1.0 — farther = slightly faded
-            return (
-              <g key={card.space.id} transform={`translate(${card.x}, ${card.y}) scale(${depthScale})`} opacity={depthOpacity}>
-                <GroveCard
-                  title={card.space.title}
-                  cardCount={Number(card.space.card_count) || 0}
-                  fragment={card.space.fragment}
-                  fragmentAuthor={card.space.fragment_author}
-                  description={card.space.description}
-                  visibility={vis}
-                  isMatch={isMatch}
-                  onClick={(e) => handleCardClick(e, card.space.id, card.x, card.y)}
-                />
-              </g>
-            );
-          })}
-        </g>
-      </svg>
+        {/* 3D Cards */}
+        {cards.map((card) => (
+          <GroveCard3D
+            key={card.space.id}
+            card={card}
+            isMatch={matchingIds === null || matchingIds.has(card.space.id)}
+            onClick={() => handleCardClick(card.space.id, card.x, card.y, card.z)}
+          />
+        ))}
+      </Canvas>
 
       {/* Fixed UI overlay */}
       <div className="grove-wordmark">Groven</div>
@@ -386,8 +506,8 @@ const GrovePage: React.FC = () => {
       </div>
 
       {showHint && (
-        <div className="grove-hint" style={{ opacity: interactedRef.current ? 0 : 1 }}>
-          Scroll to dive &middot; Drag to explore
+        <div className="grove-hint">
+          Drag to move through &middot; Scroll to walk
         </div>
       )}
 
@@ -420,10 +540,7 @@ const GrovePage: React.FC = () => {
 
       {/* Fly-through dark overlay */}
       {flyOverlay > 0 && (
-        <div
-          className="grove-fly-overlay"
-          style={{ opacity: flyOverlay }}
-        />
+        <div className="grove-fly-overlay" style={{ opacity: flyOverlay }} />
       )}
 
       {/* New space modal */}
