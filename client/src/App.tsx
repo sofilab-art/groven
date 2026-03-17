@@ -21,9 +21,9 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
-      {/* Grove renders outside Layout — full-screen dark experience */}
-      <Route path="/" element={<ProtectedRoute><GrovePage /></ProtectedRoute>} />
-      <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+      {/* Grove renders outside Layout — full-screen dark experience, publicly accessible */}
+      <Route path="/" element={<GrovePage />} />
+      <Route element={<Layout />}>
         <Route path="/spaces/:spaceId" element={<SpacePage />} />
         <Route path="/cards/:cardId" element={<CardPage />} />
       </Route>
