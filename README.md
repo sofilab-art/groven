@@ -1,122 +1,238 @@
-# Groven Prototype
+# Groven — Structured Deliberation Platform
 
-**Behavioral prototype for structured deliberation.**
+**Concept v6 prototype: Grove entry experience, multi-room model, 10 card types, multi-link graph, multiple readings, temperature voting.**
 
-**Demo:** https://groven.pythonanywhere.com/
+Groven tests a core hypothesis: does typing and linking contributions change how people deliberate? Every contribution is a **card** with a semantic type proposed by an AI, confirmed or overridden by the author. When the author disagrees with the AI's classification, the card is marked **contested**, making disagreement visible in the graph.
 
-Groven tests a core hypothesis: does typing contributions (clarification, extension, reframing, contradiction, synthesis) change how people contribute to a discussion?
+Cards are connected by typed **links** — builds_on, questions, contradicts, reframes, supports, evidences, amends, answers, spins_off, implements — forming a multi-link deliberation graph rather than a flat thread or simple tree.
 
-Every contribution is either a **Seed** (a root argument) or a **Branch** (a response to an existing node). Branches carry a semantic type — proposed by an LLM, confirmed or overridden by the author. When the author disagrees with the LLM's classification, the node is marked as **contested**, making disagreement visible in the graph.
+## What's new in v6
 
-Branches can also be flagged as **questions** — a modifier orthogonal to the five types. "What do you mean by X?" is *requesting* clarification, not *providing* it. The LLM detects questions automatically; the author can toggle the flag. Question nodes keep their type color but display a **?** marker in the graph and badges, signalling an unresolved thread that needs attention.
+- **The Grove** — full-screen dark forest landscape as the platform entry point. Spaces appear as cards growing from a shared ground plane. Navigate by scrolling (zoom/depth), trackpad swiping (lateral), or dragging. Stars twinkle above, decorative plants sway between cards, and ground fog drifts along the ground line.
+- **Semantic zoom** — as you zoom toward a card, it progressively reveals more information: title → author → fragment → full description
+- **Depth variation** — cards are staggered at different depths with perspective scaling (farther cards appear smaller and slightly faded)
+- **Decorative atmosphere** — 5 plant types (grass tufts, ferns, sprouts, tall grass, moss clusters) at various scales and opacities, all rooted at the ground level
+- **Concern input** — "What's on your mind?" search bar filters spaces in real-time; if no match, prompts to create a new conversation
+- **Plaza removed from UI** — the Plaza room type is hidden from tabs; the Grove IS the entry experience
+- **Fragment data** — spaces API returns the most recent card body, author, and date for preview in the Grove
+- **Fly-through transitions** — clicking a card triggers a cinematic zoom animation that flies the camera through the card into the space; returning zooms back out to the grove overview. Separate easing curves for pan (ease-out) and zoom (ease-in) create an organic feel.
+- **Back-to-Grove button** — dedicated back arrow in the nav bar for clear navigation from spaces back to the Grove
 
-Once enough threads diverge, the LLM can **suggest synthesis nodes** — concrete proposals that connect different lines of argument. Synthesis nodes are votable: participants take a position (Support / Oppose) with a one-sentence justification.
+### Retained from v5
 
-## What this prototype is for
-
-This is a **Verhaltensprototyp** (behavioral prototype) — not a product. It exists to answer:
-
-1. Do people accept or override the LLM's type proposals? In which cases?
-2. Does the requirement to describe lineage ("What does this build on?") change contribution quality?
-3. Which branch types emerge most frequently? Which are rare?
-4. Are contested nodes perceived as more interesting?
-5. Does typed, tree-structured discussion go deeper than flat threads — or does it break off sooner?
-6. Do LLM-generated synthesis proposals help groups converge on actionable decisions?
-
-The prototype ships with four pre-loaded discussion spaces — three in the context of CORPUS (a music rights governance project) and one about programming Helmut Lachenmann for an ensemble season (including a synthesis proposal with example votes). The deliberation structure is domain-agnostic.
+- **Multi-room model** — Tables for focused deliberation (Plaza hidden, kept in DB)
+- **10 card types** — question, claim, experience, evidence, proposal, amendment, summary, request, offer
+- **10 link relations** — typed directional edges between cards
+- **Multiple readings** — author + AI classifications; disagreement = contested
+- **Temperature voting** — Support/Oppose with justification and arc gauge
+- **Synthesis suggestions** — AI-powered reasoning + structural analysis
 
 ## Stack
 
-- **Backend:** Python / Flask, SQLite
-- **Frontend:** Vanilla JS, D3.js v7 (CDN)
-- **LLM:** OpenAI gpt-5-mini (classification, titles, lineage, proposal summaries) + gpt-5.2 with reasoning (synthesis suggestions)
-- No authentication, no SPA framework, no build step.
+- **Backend:** Node.js + TypeScript + Express
+- **Frontend:** React 19 + Vite + D3.js v7
+- **Database:** PostgreSQL 18
+- **LLM:** Mistral AI (`@mistralai/mistralai` SDK)
+  - `mistral-small-latest` — classification, titles, lineage, reclassification
+  - `mistral-large-latest` — synthesis suggestions (reasoning + structural analysis)
+- **Auth:** express-session + bcrypt + connect-pg-simple
+- **Monorepo:** npm workspaces (server/ + client/)
+- **Fonts:** Outfit (UI) + Cormorant Garamond (fragment text)
 
 ## Setup
+
+### Prerequisites
+
+- Node.js 18+
+- PostgreSQL (running locally on port 5432)
+
+### Install
 
 ```bash
 git clone https://github.com/sofilab-art/groven.git
 cd groven
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+npm install
 ```
+
+### Environment
 
 Create a `.env` file in the project root:
 
 ```
-OPENAI_API_KEY=sk-...
-FLASK_DEBUG=1
+MISTRAL_API_KEY=your-mistral-api-key
+DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/groven
+SESSION_SECRET=your-session-secret
 ```
 
-Run:
+### Database
+
+Create the database and run migrations:
 
 ```bash
-flask --app main run
+createdb groven
+npm run migrate -w server
 ```
 
-Open http://localhost:5000. Seed data loads automatically on first start.
+Optionally seed with 4 demo spaces and 5 demo users:
+
+```bash
+npm run seed -w server
+```
+
+Demo accounts: `elena`, `marcus`, `sofia`, `david`, `anna` (all password: `password`)
+
+### Run
+
+```bash
+npm run dev
+```
+
+Opens Express on `:3000` and Vite on `:5173`. Visit http://localhost:5173.
+
+### Production deployment (Railway + Supabase)
+
+1. Create a [Supabase](https://supabase.com) project → copy the Postgres connection string (direct, port 5432)
+2. Create a [Railway](https://railway.com) project → connect this GitHub repo, set branch to `main`
+3. Add environment variables in Railway:
+   - `DATABASE_URL` — Supabase Postgres connection string
+   - `MISTRAL_API_KEY` — your Mistral AI key
+   - `SESSION_SECRET` — random secret string
+   - `NODE_ENV` — `production`
+4. Railway auto-deploys on every push to `main`
 
 ## How it works
 
+### The Grove (entry experience)
+
+The Grove is a full-screen dark SVG landscape. Spaces appear as translucent cards anchored to a shared ground plane, spread horizontally with depth variation. Background layers include:
+
+- **Starfield** — 80 twinkling stars above the ground line (parallax layer)
+- **Decorative plants** — grass, ferns, sprouts, and moss growing from the ground
+- **Ground fog** — multiple overlapping fog ellipses drifting along the ground
+
+Navigation: scroll to zoom in/out, trackpad swipe or drag to pan, arrow keys/WASD for keyboard control. Position is saved to session storage and restored on back-navigation.
+
+**Semantic zoom** progressively reveals card content as you approach:
+- Far: title only (minimal)
+- Medium: title + author
+- Close: title + author + first sentence of fragment
+- Very close: full fragment + space description
+
 ### Data model
 
-- **Spaces** — deliberation topics (open / ready / decided)
-- **Nodes** — contributions: Seeds (root) or Branches (with parent)
-- **Branch types** — clarification | extension | reframing | contradiction | synthesis
-- **Question flag** — boolean modifier on any branch type (`is_question`)
+- **Spaces** — deliberation topics (shown as cards in the Grove)
+- **Rooms** — Tables (focused topics, user-created). Plaza exists in DB but hidden from UI.
+- **Cards** — contributions with a semantic type, body, title, optional lineage description
+- **Links** — typed directional edges between cards (10 relation types)
+- **Readings** — author and AI classifications for each card (type, is_question, explanation)
+- **Temperature votes** — Support/Oppose with justification on any card
 
 ### Contribution flow
 
-1. Author writes a branch contribution (body text only)
-2. The analysis streams progressively via SSE: classification arrives first and the review modal opens immediately; title and lineage generate in parallel and fill in as they arrive (animated loading stripes show progress)
-3. LLM proposes a branch type, detects whether it's a question, generates a title, lineage description, and two-sentence explanation. Question titles are phrased as questions ending with **?** to spark conversation
-4. Author reviews everything in a modal — can edit title and lineage, confirm or override the type, and toggle the "This is a question" checkbox
-5. If the author picks a different type, the LLM rethinks and explains why the author's reading is reasonable
-6. If overridden, the node is flagged as **contested**
-7. The graph updates — contested nodes have a dashed border, question nodes show a **?** overlay
+1. Author writes a card (body text)
+2. Analysis streams via SSE: classification → title + lineage (parallel)
+3. AI proposes card type, detects questions, generates title and lineage description
+4. Author reviews in a modal — can edit title/lineage, override the type, toggle question flag, choose link relation
+5. If the author picks a different type, AI rethinks and explains why the override is reasonable
+6. Both readings (author + AI) are saved; disagreement marks the card as **contested**
+7. The graph updates — contested cards have visual indicators, question cards show a **?** overlay
 
 ### Synthesis suggestions
 
-When a discussion has enough complexity (3+ nodes), anyone can click **Suggest synthesis**. The LLM (gpt-5.2 with reasoning) analyses the full discussion tree and proposes 1–3 synthesis nodes — concrete, actionable proposals that connect divergent threads. Each suggestion includes a title, body, one-sentence proposal summary, and reasoning. Accepted suggestions are saved as "Groven AI" nodes.
+Click **Suggest Synthesis** to have the AI (`mistral-large-latest`) analyse the full discussion and propose 1–3 synthesis cards. The AI's reasoning streams in real-time, followed by concrete suggestions with titles, bodies, and lineage. Accepted suggestions become new cards in the room.
 
-### Voting
+### Temperature voting
 
-Synthesis nodes are proposals. Participants can **Support** or **Oppose** with a one-sentence justification. Vote tallies appear on the graph and in node detail. The proposal summary (generated by gpt-5-mini) is displayed prominently so voters understand what they are taking a position on.
-
-Synthesis nodes display a **vote arc gauge** — a ring around the node that fills proportionally as votes come in. Green arcs show support, red arcs show opposition. Eight votes fill the full circle; below that, the remaining ring stays as a dashed purple halo, showing at a glance both the vote balance *and* whether enough people have voted. The gauge updates live after inline votes.
+Any card can receive Support or Oppose votes with a required one-sentence justification. Proposal and summary cards display a **vote arc gauge** — a ring that fills proportionally with green (support) and red (oppose) arcs.
 
 ### Visualization
 
-D3.js force-directed graph. Node color = branch type. Node size distinguishes seeds from branches. Synthesis nodes have a dashed purple halo that doubles as the vote arc gauge background — green and red arcs fill in proportionally as votes arrive. Contested nodes have dashed amber borders. Question nodes display a white **?** on the circle. Click a node for inline detail and voting; hover for tooltip. Type badges append **?** for questions (e.g. "clarification?"). Arrows to synthesis nodes stop at the halo edge rather than the inner circle.
+D3.js force-directed graph. Each card type has a distinct color. Links are drawn with relation-based colors and curved paths when multiple links exist between the same pair. Question cards show a **?** marker. Contested cards (AI ≠ author reading) have a dotted border indicator. Click a card for full detail, voting, and response; drag to rearrange; scroll to zoom.
+
+## Project structure
+
+```
+groven/
+├── package.json                # npm workspaces root
+├── .env                        # API keys and DB connection
+├── server/
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── src/
+│       ├── index.ts            # Express app, middleware, session, static serving
+│       ├── db.ts               # pg Pool connection
+│       ├── migrate.ts          # CREATE TYPE + CREATE TABLE
+│       ├── seed.ts             # 4 demo spaces with users, cards, links, votes
+│       ├── llm.ts              # Mistral AI: classify, title, lineage, reclassify, synthesis
+│       ├── types.ts            # TypeScript types and enums
+│       ├── middleware/auth.ts  # requireAuth session middleware
+│       └── routes/
+│           ├── auth.ts         # register, login, logout, me
+│           ├── spaces.ts       # CRUD + fragment data for Grove
+│           ├── rooms.ts        # list, create Table
+│           ├── cards.ts        # CRUD, SSE preview, reclassify, graph endpoint
+│           ├── votes.ts        # temperature voting (upsert)
+│           ├── synthesis.ts    # SSE streaming synthesis suggestions
+│           └── admin.ts        # seed route
+└── client/
+    ├── package.json
+    ├── vite.config.ts          # proxy /api → Express :3000
+    └── src/
+        ├── App.tsx             # React Router (Grove outside Layout)
+        ├── api.ts              # fetch wrappers + SSE helpers
+        ├── context/AuthContext.tsx
+        ├── pages/
+        │   ├── LoginPage.tsx   # login/register tabs
+        │   ├── GrovePage.tsx   # Grove entry experience (full-screen dark SVG)
+        │   ├── SpacePage.tsx   # rooms, graph, detail panel, contribute
+        │   └── CardPage.tsx    # full card detail with links and votes
+        ├── components/
+        │   ├── Layout.tsx      # nav bar with auth state
+        │   ├── Graph.tsx       # D3 force-directed graph (ref-based)
+        │   ├── grove/          # Grove atmosphere components
+        │   │   ├── GroveCard.tsx    # Card representation with semantic zoom
+        │   │   ├── DecoPlants.tsx   # 5 plant types with depth variation
+        │   │   └── Starfield.tsx    # Twinkling stars (sky only)
+        │   ├── CardDetail.tsx  # inline detail panel
+        │   ├── ContributeForm.tsx
+        │   ├── ReviewModal.tsx # SSE streaming review
+        │   ├── SynthesisModal.tsx
+        │   ├── VotePanel.tsx   # support/oppose + arc gauge
+        │   ├── TypeBadge.tsx
+        │   ├── ReadingsList.tsx
+        │   ├── RoomTabs.tsx    # Table tabs (Plaza filtered out)
+        │   ├── NewSpaceModal.tsx
+        │   └── NewTableModal.tsx
+        ├── hooks/
+        │   └── useGroveNavigation.ts  # Scroll/drag/key/touch navigation engine
+        └── styles/globals.css  # design system (Outfit + Cormorant Garamond, forest/mint/cream + grove dark)
+```
+
+## Design system
+
+- **Fonts:** Outfit (UI), Cormorant Garamond (fragment text in Grove)
+- **Palette:** forest (#2d4a3e), mint (#7bc4a5), cream (#faf8f0)
+- **Grove palette:** dark (#080f07), forest (#1B4332), mint (#74C69D), cream (#F8F5F0)
+- Each card type has a distinct color
+- Responsive layout with breakpoints at 900px and 600px
+
+## Seeded spaces
+
+1. **Royalty Distribution in the Age of AI** — fair compensation when AI is involved in music creation
+2. **Creative Attribution Standards** — crediting human and AI contributions
+3. **Open Licensing Infrastructure** — technical infrastructure for AI-era music licensing
+4. **Programming Lachenmann for Ensemble** — programming Helmut Lachenmann for an ensemble season
 
 ## What this prototype does NOT include
 
 | Excluded | Reason |
 |----------|--------|
-| User auth / login | Not needed for behavioral testing |
-| Mobile optimization | D3 graphs on mobile are impractical |
-| Filtering by type or author | Useful at >50 nodes, not at prototype scale |
-| Persistent sessions | Not needed for behavioral testing |
-
-## Project structure
-
-```
-main.py              Flask app, all routes
-db.py                SQLite schema + helpers (spaces, nodes, votes)
-llm.py               OpenAI API: classification, titles, lineage,
-                     reclassification, proposal summaries, synthesis suggestions
-seed_data.py         Four pre-loaded discussion spaces
-static/
-  style.css          Forest/mint/cream palette, Outfit font
-  graph.js           D3.js force-directed graph + inline node detail/voting
-  main.js            Form logic, review modal, synthesis suggestion modal
-templates/
-  base.html          Layout + nav
-  index.html         Space overview + new space modal
-  space.html         Graph + contribution form + modals
-  node.html          Node detail with lineage, voting, breadcrumb
-```
+| Formal governance voting (Assembly/Ballot/Decision) | Deferred to later version |
+| Proposal Lab and Library rooms | Deferred |
+| Steward roles and actions | Deferred |
+| Source bundles | Deferred |
+| Non-text content (images, video, audio) | Deferred |
+| OAuth/SSO | Simple session auth sufficient for testing |
 
 ## License
 
