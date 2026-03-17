@@ -4,7 +4,7 @@
   "workspaces": ["server", "client"],
   "scripts": {
     "dev": "concurrently \"npm run dev -w server\" \"npm run dev -w client\"",
-    "build": "npm run build -w client",
+    "build": "npm run build -w client && npm run migrate -w server",
     "migrate": "npm run migrate -w server",
     "seed": "npm run seed -w server"
   },

@@ -51,7 +51,6 @@ Cards are connected by typed **links** — builds_on, questions, contradicts, re
 ```bash
 git clone https://github.com/sofilab-art/groven.git
 cd groven
-git checkout concept-v5
 npm install
 ```
 
@@ -89,6 +88,17 @@ npm run dev
 ```
 
 Opens Express on `:3000` and Vite on `:5173`. Visit http://localhost:5173.
+
+### Production deployment (Railway + Supabase)
+
+1. Create a [Supabase](https://supabase.com) project → copy the Postgres connection string (direct, port 5432)
+2. Create a [Railway](https://railway.com) project → connect this GitHub repo, set branch to `main`
+3. Add environment variables in Railway:
+   - `DATABASE_URL` — Supabase Postgres connection string
+   - `MISTRAL_API_KEY` — your Mistral AI key
+   - `SESSION_SECRET` — random secret string
+   - `NODE_ENV` — `production`
+4. Railway auto-deploys on every push to `main`
 
 ## How it works
 
