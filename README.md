@@ -1,6 +1,12 @@
 # Groven — Structured Deliberation Platform
 
-**Concept v6 prototype: Grove entry experience, multi-room model, 10 card types, multi-link graph, multiple readings, temperature voting.**
+> **Live prototype:** [groven-server-production.up.railway.app](https://groven-server-production.up.railway.app)
+
+**This is a behavioural prototype, not a production application.** It was developed by a non-developer using [Claude Code](https://claude.ai/claude-code) to explore and test interaction concepts for structured deliberation. The codebase reflects that origin — it is functional enough to demonstrate ideas and gather feedback, but would need real development capacity before it could evolve into an actual product.
+
+---
+
+**Concept v6: Grove entry experience, multi-room model, 10 card types, multi-link graph, multiple readings, temperature voting.**
 
 Groven tests a core hypothesis: does typing and linking contributions change how people deliberate? Every contribution is a **card** with a semantic type proposed by an AI, confirmed or overridden by the author. When the author disagrees with the AI's classification, the card is marked **contested**, making disagreement visible in the graph.
 
@@ -31,15 +37,16 @@ Cards are connected by typed **links** — builds_on, questions, contradicts, re
 
 - **Backend:** Node.js + TypeScript + Express
 - **Frontend:** React 19 + Vite + D3.js v7
-- **Database:** PostgreSQL 18
+- **Database:** PostgreSQL (Supabase)
 - **LLM:** Mistral AI (`@mistralai/mistralai` SDK)
   - `mistral-small-latest` — classification, titles, lineage, reclassification
   - `mistral-large-latest` — synthesis suggestions (reasoning + structural analysis)
 - **Auth:** express-session + bcrypt + connect-pg-simple
+- **Hosting:** Railway (auto-deploys on push to main)
 - **Monorepo:** npm workspaces (server/ + client/)
 - **Fonts:** Outfit (UI) + Cormorant Garamond (fragment text)
 
-## Setup
+## Local development
 
 ### Prerequisites
 
@@ -88,17 +95,6 @@ npm run dev
 ```
 
 Opens Express on `:3000` and Vite on `:5173`. Visit http://localhost:5173.
-
-### Production deployment (Railway + Supabase)
-
-1. Create a [Supabase](https://supabase.com) project → copy the Postgres connection string (direct, port 5432)
-2. Create a [Railway](https://railway.com) project → connect this GitHub repo, set branch to `main`
-3. Add environment variables in Railway:
-   - `DATABASE_URL` — Supabase Postgres connection string
-   - `MISTRAL_API_KEY` — your Mistral AI key
-   - `SESSION_SECRET` — random secret string
-   - `NODE_ENV` — `production`
-4. Railway auto-deploys on every push to `main`
 
 ## How it works
 
@@ -155,6 +151,7 @@ D3.js force-directed graph. Each card type has a distinct color. Links are drawn
 groven/
 ├── package.json                # npm workspaces root
 ├── .env                        # API keys and DB connection
+├── concepts/                   # Design docs, concept papers, planning documents
 ├── server/
 │   ├── package.json
 │   ├── tsconfig.json
